@@ -22,7 +22,7 @@
 - Transfers are never counted as spending or income.
 - Starter expense categories: Food, Groceries, Transport, Rent, Bills, Shopping, Education, Health, Entertainment, Gifts, Sending home, Other.
 - Starter income categories: Scholarship/Stipend, From family, Part-time work, Gift, Refund, Other.
-- Starter accounts: WeChat, Alipay, Bank card, Cash (CNY); Pakistani bank, Cash, JazzCash, Easypaisa (PKR); USD account (USD). All with opening balance 0.
+- Starter accounts are WeChat, Alipay, Bank card and Cash (CNY) in CNY, Pakistani bank, Cash (PKR), JazzCash and Easypaisa in PKR, and USD account in USD. All with opening balance 0.
 - Fonts Bricolage Grotesque and Instrument Sans are bundled as assets. Never use runtime Google Fonts download (blocked in China).
 - Icons: Phosphor duotone.
 - Color tokens and rules exactly as spec section 12. Brass `#E8B83A` is identical in both themes and only ever a fill with ink `#15201B` on top.
