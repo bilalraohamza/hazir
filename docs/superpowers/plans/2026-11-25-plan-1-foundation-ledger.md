@@ -202,7 +202,7 @@ test('convert rounds half up, no truncation', () {
     - `Stream<List<CategorySpend>> watchSpending(DateTime month)` where `CategorySpend { Category category; Money total; int count; }`, expenses only, converted to main currency with each entry's own-day rate, sorted by total descending.
     - `Stream<List<Transaction>> watchEntries({int? categoryId, DateTime? month})`.
 
-- [ ] **Step 1: Write failing tests** (in-memory db, seeded, fake fx):
+- [x] **Step 1: Write failing tests** (in-memory db, seeded, fake fx):
   - expense 28.00 from WeChat → WeChat balance −28.00, Food spend 28.00;
   - validation: amount 0 → `non_positive_amount`; PKR money on CNY account → `currency_mismatch`; income category on expense → `wrong_category_kind`; transfer to same account → `same_account`;
   - transfer 5000 PKR from Pakistani bank to Alipay with `received` 122.00 CNY → balances −5000 PKR and +122 CNY, spending for the month is empty;
@@ -212,10 +212,10 @@ test('convert rounds half up, no truncation', () {
   - a PKR expense's converted spend stays identical after a new day's snapshot with a different rate is added;
   - expense at 23:59 on 30 Nov local time counts in November, not December (Review Focus 5);
   - `watchWorth` with no snapshots and a PKR balance → `total == null`, `ratesMissing == true`, `byCurrency['CNY']` correct (Review Focus 2).
-- [ ] **Step 2:** Run → FAIL.
-- [ ] **Step 3:** Implement. Compute balances and sums with SQL aggregates per account and currency, then do currency conversion in Dart with `convert`; never sum across currencies in SQL.
-- [ ] **Step 4:** Run `flutter test test/features/ledger` → PASS.
-- [ ] **Step 5: Commit** `feat: ledger service with validation, balances, worth and spending`
+- [x] **Step 2:** Run → FAIL.
+- [x] **Step 3:** Implement. Compute balances and sums with SQL aggregates per account and currency, then do currency conversion in Dart with `convert`; never sum across currencies in SQL.
+- [x] **Step 4:** Run `flutter test test/features/ledger` → PASS.
+- [x] **Step 5: Commit** `feat: ledger service with validation, balances, worth and spending`
 
 ### Task 6: Design system
 
