@@ -169,16 +169,16 @@ test('convert rounds half up, no truncation', () {
   - `Future<Decimal?> rateForDay(String from, String to, String day)`: rate from that exact snapshot day.
   - `Future<void> backfillFxDays()`: for transactions with `fxDay == null`, set `fxDay` to the earliest snapshot day on or after their date (once set, never changed).
 
-- [ ] **Step 1: Write failing tests** with a `FakeRatesApi` and fixed clock:
+- [x] **Step 1: Write failing tests** with a `FakeRatesApi` and fixed clock:
   - after refresh, `rate('PKR','CNY')` equals `crossRate(281.5, 7.1)`;
   - second refresh on same day does not call the API (count calls);
   - API throwing → `rate` falls back to yesterday's snapshot and `isStale()` is true;
   - empty database and API throwing → `rate('PKR','CNY')` is null, `rate('CNY','CNY')` is 1;
   - a transaction saved with no snapshots gets `fxDay` filled by `backfillFxDays()` after the first successful refresh, and a later refresh does not change it.
-- [ ] **Step 2:** Run → FAIL.
-- [ ] **Step 3:** Implement.
-- [ ] **Step 4:** Run `flutter test test/features/fx` → PASS.
-- [ ] **Step 5: Commit** `feat: daily exchange rate snapshots with fallback`
+- [x] **Step 2:** Run → FAIL.
+- [x] **Step 3:** Implement.
+- [x] **Step 4:** Run `flutter test test/features/fx` → PASS.
+- [x] **Step 5: Commit** `feat: daily exchange rate snapshots with fallback`
 
 ### Task 5: Ledger service
 
