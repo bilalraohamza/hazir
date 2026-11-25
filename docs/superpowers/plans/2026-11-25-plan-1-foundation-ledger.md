@@ -107,7 +107,7 @@ test/...                             mirrors lib/
   - `Money convert(Money m, Decimal rate, String toCurrency)`: multiply major amount by rate, round half-up to the target's minor unit.
   - `Decimal crossRate(Decimal fromPerUsd, Decimal toPerUsd)` = `toPerUsd / fromPerUsd`, computed with at least 12 decimal places of precision.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```dart
 test('parse and format', () {
@@ -126,10 +126,10 @@ test('convert rounds half up, no truncation', () {
 });
 ```
 
-- [ ] **Step 2:** Run `flutter test test/core/money` → FAIL (undefined).
-- [ ] **Step 3:** Implement the signatures above. Use `Decimal` for all intermediate math; `Decimal.round` is not half-up for negatives, so implement half-up on absolute value and reapply sign.
-- [ ] **Step 4:** Run `flutter test test/core/money` → PASS.
-- [ ] **Step 5: Commit** `feat: money value type, parsing, formatting and conversion`
+- [x] **Step 2:** Run `flutter test test/core/money` → FAIL (undefined).
+- [x] **Step 3:** Implement the signatures above. Use `Decimal` for all intermediate math; `Decimal.round` is not half-up for negatives, so implement half-up on absolute value and reapply sign.
+- [x] **Step 4:** Run `flutter test test/core/money` → PASS.
+- [x] **Step 5: Commit** `feat: money value type, parsing, formatting and conversion`
 
 ### Task 3: Database schema and seed
 
