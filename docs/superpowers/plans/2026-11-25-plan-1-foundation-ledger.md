@@ -146,11 +146,11 @@ test('convert rounds half up, no truncation', () {
   - `Settings`: key (text primary key), value (text). Keys used now: `mainCurrency` (default `CNY`).
 - `class AppDatabase extends _$AppDatabase` with `AppDatabase(QueryExecutor e)`, `schemaVersion => 1`, and `Future<void> seedIfEmpty()` from `seed.dart` inserting starter accounts and categories from Global Constraints.
 
-- [ ] **Step 1: Write failing test** using `AppDatabase(NativeDatabase.memory())`: after `seedIfEmpty()` twice, `accounts` has 9 rows (4 CNY, 4 PKR, 1 USD), expense categories = 12, income categories = 6, and `Settings` `mainCurrency` = `CNY`.
-- [ ] **Step 2:** Run → FAIL.
-- [ ] **Step 3:** Implement tables and seed; run `dart run build_runner build --delete-conflicting-outputs`.
-- [ ] **Step 4:** Run `flutter test test/data/db` → PASS.
-- [ ] **Step 5: Commit** `feat: drift schema and starter data`
+- [x] **Step 1: Write failing test** using `AppDatabase(NativeDatabase.memory())`: after `seedIfEmpty()` twice, `accounts` has 9 rows (4 CNY, 4 PKR, 1 USD), expense categories = 12, income categories = 6, and `Settings` `mainCurrency` = `CNY`.
+- [x] **Step 2:** Run → FAIL.
+- [x] **Step 3:** Implement tables and seed; run `dart run build_runner build --delete-conflicting-outputs`.
+- [x] **Step 4:** Run `flutter test test/data/db` → PASS.
+- [x] **Step 5: Commit** `feat: drift schema and starter data`
 
 ### Task 4: Exchange rates
 
