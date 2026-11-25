@@ -2,7 +2,7 @@
 
 Date: 2026-11-25
 Owner: Rao
-Status: Draft, awaiting approval
+Status: Approved by Rao on 2026-11-25
 
 ## 1. Intent and why
 
@@ -124,7 +124,7 @@ Layouts of Spending, Goals and Upcoming are left to the builder within the desig
 - Every account has exactly one currency. Every transaction is stored in its account's original currency and is never rewritten when rates change.
 - Conversion happens only for display and for combined totals, using the cached daily rate.
 - Main currency is CNY by default and can be changed in Settings; changing it only changes display.
-- Rate history (builder's call): the free rate API has no history, so the app saves one rate snapshot per day from install onward in a rates table. Each transaction also stores the rate to the main currency on its date. Category limits and monthly spending use each entry's stored rate, so they never shift when rates move. The Wealth history chart and the exchange-rate effect use the daily snapshots; dates before install show no history. If a day's fetch fails, the last saved rate is used and marked as such.
+- Rate history (builder's call): the free rate API has no history, so the app saves one rate snapshot per day from install onward in a rates table. Each transaction stores the rate snapshot day it uses (frozen once set), so it can be converted to any main currency consistently. Category limits and monthly spending use each entry's stored rate, so they never shift when rates move. The Wealth history chart and the exchange-rate effect use the daily snapshots; dates before install show no history. If a day's fetch fails, the last saved rate is used and marked as such.
 - Starting currencies: CNY, PKR, USD. Any ISO currency can be added.
 - Starting accounts (all editable): WeChat, Alipay, Bank card, Cash (CNY); Pakistani bank, Cash, JazzCash, Easypaisa (PKR); USD account (USD).
 

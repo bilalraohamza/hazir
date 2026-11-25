@@ -4,7 +4,7 @@
 
 **Goal:** A working Android budget app without the AI agent: exact multi-currency money math, a local database, daily exchange rates, the visual design system, manual entry of expenses, income and transfers, and the Wealth and Spending screens.
 
-**Architecture:** Flutter app organised by feature folders. Pure Dart domain code (money, ledger, fx) sits under `lib/core` and `lib/features/*/domain`, tested without Flutter. Drift (SQLite) is the single source of truth; Riverpod providers expose services and streams to screens. Later plans add the agent, limits, upcoming items, goals, debts and backups as new feature folders on top of the same services.
+**Architecture:** Flutter app organised by feature folders. Pure Dart code (money, ledger, fx, account and category services) sits under `lib/core` and `lib/features/<feature>/`, using exactly the paths in each task, and is tested without widgets. Drift (SQLite) is the single source of truth; Riverpod providers expose services and streams to screens. Later plans add the agent, limits, upcoming items, goals, debts and backups as new feature folders on top of the same services.
 
 **Tech Stack:** Flutter (stable), Dart, drift + drift_flutter, flutter_riverpod, go_router, fl_chart, dio, decimal, intl, phosphor_flutter.
 
@@ -28,6 +28,8 @@
 - Color tokens and rules exactly as spec section 12. Brass `#E8B83A` is identical in both themes and only ever a fill with ink `#15201B` on top.
 - UI copy: sentence case, no all-caps labels, no middle-dot separators.
 - Month boundaries use the phone's local time zone.
+- App display name is "Hazir" (Android label and MaterialApp title); the Flutter project name stays `budget_app`.
+- The repository root is the existing git repository (on Rao's machine `D:\Study\Project\hazir-app`). There is no `budget-app/` subfolder and no new `git init`.
 
 ## Review Focus
 
@@ -64,6 +66,9 @@ lib/features/wealth/wealth_screen.dart
 lib/features/wealth/account_edit_sheet.dart
 lib/features/spending/spending_screen.dart
 lib/features/spending/category_entries_screen.dart
+lib/features/accounts/account_service.dart
+lib/features/categories/category_service.dart
+lib/features/settings/settings_screen.dart
 lib/ui/theme/app_colors.dart         AppColors ThemeExtension
 lib/ui/theme/app_theme.dart          light/dark ThemeData
 lib/ui/widgets/amount_text.dart      big numerals widget
@@ -76,12 +81,12 @@ test/...                             mirrors lib/
 ### Task 1: Project setup
 
 **Files:**
-- Create: Flutter project in repo root `budget-app/`, `pubspec.yaml`, `assets/fonts/*`, `lib/main.dart`, `test/smoke_test.dart`
+- Create: Flutter project in the existing repository root, `pubspec.yaml`, `assets/fonts/*`, `lib/main.dart`, `test/smoke_test.dart`
 
 **Interfaces:**
 - Produces: a building Android app with all dependencies resolved and fonts registered as families `Bricolage` and `Instrument`.
 
-- [ ] **Step 1:** `git init` in `budget-app/` (the `docs/` folder already exists), then `flutter create --org com.rao --project-name budget_app --platforms android,ios .`
+- [ ] **Step 1:** In the existing repository root (already a git repo with `docs/` and `AGENTS.md`; do not run `git init`), run `flutter create --org com.rao --project-name budget_app --platforms android,ios .` Then set the display name: `android:label="Hazir"` in `android/app/src/main/AndroidManifest.xml`, `CFBundleDisplayName` = `Hazir` in `ios/Runner/Info.plist`, and `title: 'Hazir'` on the MaterialApp.
 - [ ] **Step 2:** Add dependencies: `flutter pub add flutter_riverpod go_router drift drift_flutter fl_chart dio decimal intl phosphor_flutter path_provider` and `flutter pub add --dev drift_dev build_runner`.
 - [ ] **Step 3:** Download the two variable fonts (OFL) from their official GitHub releases or Google Fonts website into `assets/fonts/`, add their `OFL.txt` files next to them, and register them in `pubspec.yaml` under `flutter: fonts:` as families `Bricolage` and `Instrument`.
 - [ ] **Step 4: Write smoke test** `test/smoke_test.dart`: pump `const ProviderScope(child: BudgetApp())` and `expect(find.byType(MaterialApp), findsOneWidget)`. (`BudgetApp` can be a bare `MaterialApp` for now in `lib/app/app.dart`.)
@@ -136,7 +141,7 @@ test('convert rounds half up, no truncation', () {
 - Produces Drift tables (all ids `int` autoincrement; dates stored as `DateTime`):
   - `Accounts`: id, name (text, unique among non-archived), currency (text), openingMinor (int, default 0), isCredit (bool, default false), archived (bool, default false), sortOrder (int).
   - `Categories`: id, name, kind (text: `expense` | `income`), iconKey (text), archived (bool, default false).
-  - `Transactions`: id, kind (text: `expense` | `income` | `transfer`), accountId, amountMinor (int, always positive), currency, categoryId (nullable), toAccountId (nullable), toAmountMinor (nullable), toCurrency (nullable), note (nullable), occurredAt, createdAt.
+  - `Transactions`: id, kind (text: `expense` | `income` | `transfer`), accountId, amountMinor (int, always positive), currency, categoryId (nullable), toAccountId (nullable), toAmountMinor (nullable), toCurrency (nullable), note (nullable), occurredAt, createdAt, fxDay (text `yyyy-MM-dd`, nullable): the rate snapshot day frozen for this entry (see Task 5).
   - `FxSnapshots`: day (text `yyyy-MM-dd`, primary key part), currency (text, part of key), perUsd (text, Decimal string), fetchedAt.
   - `Settings`: key (text primary key), value (text). Keys used now: `mainCurrency` (default `CNY`).
 - `class AppDatabase extends _$AppDatabase` with `AppDatabase(QueryExecutor e)`, `schemaVersion => 1`, and `Future<void> seedIfEmpty()` from `seed.dart` inserting starter accounts and categories from Global Constraints.
@@ -159,13 +164,17 @@ test('convert rounds half up, no truncation', () {
   - `abstract class RatesApi { Future<Map<String, Decimal>> latestPerUsd(); }` and `class ErApiRatesApi implements RatesApi` (Dio GET, reads `rates`, requires `result == "success"`, parses each value with `Decimal.parse(value.toString())`).
   - `class FxService { FxService(AppDatabase db, RatesApi api, {DateTime Function()? clock}); Future<void> refreshIfNeeded(); Future<Decimal?> rate(String from, String to, {DateTime? on}); Future<bool> isStale(); }`
   - `rate` uses the snapshot for `on` (default today); if that day has none, the latest earlier snapshot; returns `Decimal.one` when `from == to`; returns `null` when no snapshot exists at all.
-  - `refreshIfNeeded` fetches only if today has no snapshot; on failure it swallows the error (stale state is reported by `isStale`).
+  - `refreshIfNeeded` fetches only if today has no snapshot; on failure it swallows the error (stale state is reported by `isStale`). After a successful fetch it calls `backfillFxDays()`.
+  - `Future<String?> snapshotDayFor(DateTime date)`: the latest snapshot day on or before `date`, else null.
+  - `Future<Decimal?> rateForDay(String from, String to, String day)`: rate from that exact snapshot day.
+  - `Future<void> backfillFxDays()`: for transactions with `fxDay == null`, set `fxDay` to the earliest snapshot day on or after their date (once set, never changed).
 
 - [ ] **Step 1: Write failing tests** with a `FakeRatesApi` and fixed clock:
   - after refresh, `rate('PKR','CNY')` equals `crossRate(281.5, 7.1)`;
   - second refresh on same day does not call the API (count calls);
   - API throwing → `rate` falls back to yesterday's snapshot and `isStale()` is true;
-  - empty database and API throwing → `rate('PKR','CNY')` is null, `rate('CNY','CNY')` is 1.
+  - empty database and API throwing → `rate('PKR','CNY')` is null, `rate('CNY','CNY')` is 1;
+  - a transaction saved with no snapshots gets `fxDay` filled by `backfillFxDays()` after the first successful refresh, and a later refresh does not change it.
 - [ ] **Step 2:** Run → FAIL.
 - [ ] **Step 3:** Implement.
 - [ ] **Step 4:** Run `flutter test test/features/fx` → PASS.
@@ -185,7 +194,9 @@ test('convert rounds half up, no truncation', () {
     - `Future<int> addExpense({required int accountId, required Money amount, required int categoryId, String? note, DateTime? at})`
     - `Future<int> addIncome({...same})`
     - `Future<int> addTransfer({required int fromAccountId, required int toAccountId, required Money amount, Money? received, Decimal? customRate, String? note, DateTime? at})`: if currencies differ, `received` wins, else `customRate`, else `FxService.rate` on that date; if none available, throw `missing_to_amount`.
-    - `Future<void> updateTransaction(int id, {Money? amount, int? categoryId, int? accountId, String? note, DateTime? at})` (same validation), `Future<void> deleteTransaction(int id)`.
+    - Every write sets `fxDay` = `FxService.snapshotDayFor(entry date)` at save time (null if none; filled later by `backfillFxDays`). Converting an entry to the main currency always uses its own `fxDay` snapshot, so past spending never shifts when rates move or the main currency changes.
+    - `class TransactionDraft { final String kind; final int accountId; final Money amount; final int? categoryId; final int? toAccountId; final Money? received; final Decimal? customRate; final String? note; final DateTime at; }`
+    - `Future<void> replaceTransaction(int id, TransactionDraft draft)`: full replacement with the same validation as the add methods (works for all three kinds, including changing a transfer's destination, received amount or rate). `note == null` means no note. `Future<void> deleteTransaction(int id)`.
     - `Stream<List<AccountBalance>> watchBalances()` where `AccountBalance { Account account; Money balance; }`, balance = opening + income - expense - transfers out + transfers in.
     - `Stream<WorthSummary> watchWorth()` where `WorthSummary { Money? total; Map<String, Money> byCurrency; bool ratesMissing; bool ratesStale; }`. `total` is null when any non-main currency has no rate.
     - `Stream<List<CategorySpend>> watchSpending(DateTime month)` where `CategorySpend { Category category; Money total; int count; }`, expenses only, converted to main currency with each entry's own-day rate, sorted by total descending.
@@ -196,7 +207,9 @@ test('convert rounds half up, no truncation', () {
   - validation: amount 0 → `non_positive_amount`; PKR money on CNY account → `currency_mismatch`; income category on expense → `wrong_category_kind`; transfer to same account → `same_account`;
   - transfer 5000 PKR from Pakistani bank to Alipay with `received` 122.00 CNY → balances −5000 PKR and +122 CNY, spending for the month is empty;
   - transfer with `customRate` 0.0245 → received 122.50 CNY;
-  - edit expense to 30.00 then delete → balance back to 0 and Food spend absent (Review Focus 3);
+  - replace expense with 30.00 then delete → balance back to 0 and Food spend absent (Review Focus 3);
+  - replace a transfer's destination from Alipay to WeChat → Alipay back to 0, WeChat increased;
+  - a PKR expense's converted spend stays identical after a new day's snapshot with a different rate is added;
   - expense at 23:59 on 30 Nov local time counts in November, not December (Review Focus 5);
   - `watchWorth` with no snapshots and a PKR balance → `total == null`, `ratesMissing == true`, `byCurrency['CNY']` correct (Review Focus 2).
 - [ ] **Step 2:** Run → FAIL.
@@ -226,7 +239,7 @@ test('convert rounds half up, no truncation', () {
 ### Task 7: App shell and navigation
 
 **Files:**
-- Create: `lib/app/router.dart`, `lib/app/providers.dart`, `lib/ui/widgets/placeholder_tab.dart`; Modify: `lib/app/app.dart`, `lib/main.dart`
+- Create: `lib/app/router.dart`, `lib/app/providers.dart`, `lib/ui/widgets/placeholder_tab.dart`, plus minimal placeholder files `lib/features/wealth/wealth_screen.dart`, `lib/features/spending/spending_screen.dart`, `lib/features/settings/settings_screen.dart`, `lib/features/entry/entry_form_screen.dart` (each a widget with the final class name showing `PlaceholderTab(title)`; Tasks 8 to 11 replace their bodies); Modify: `lib/app/app.dart`, `lib/main.dart`
 - Test: `test/app/shell_test.dart`
 
 **Interfaces:**
@@ -236,8 +249,9 @@ test('convert rounds half up, no truncation', () {
   - Routes: `/chat`, `/wealth`, `/spending`, `/goals`, `/upcoming` inside a `StatefulShellRoute` with a bottom bar; `/settings`; `/entry` (full-screen, optional `?kind=expense|income|transfer`).
   - Bottom bar labels and Phosphor duotone icons: Chat `chatCircleText`, Wealth `wallet`, Spending `chartPieSlice`, Goals `flagBanner`, Upcoming `calendarDots`. Active item sits on a brass pill with `onBrass` icon color.
   - Chat, Goals and Upcoming show `PlaceholderTab(title)` with one line "Coming in the next update" and a "+" button to `/entry` on Chat.
+  - Initial route in plan 1 is `/wealth`, because Chat is still a placeholder. Plan 2 changes the initial route to `/chat`. Tab order stays Chat, Wealth, Spending, Goals, Upcoming.
   - On start: `seedIfEmpty()` then `fxService.refreshIfNeeded()` (not awaited before first frame).
-- [ ] **Step 1: Write failing widget test:** with an in-memory db override, the app opens on Wealth, tapping "Spending" shows the Spending screen, and both light and dark themes build without exceptions.
+- [ ] **Step 1: Write failing widget test:** with an in-memory db override, the app opens on Wealth, tapping "Spending" shows the Spending screen (its placeholder for now, found by type `SpendingScreen`), and both light and dark themes build without exceptions.
 - [ ] **Step 2:** Run → FAIL. **Step 3:** Implement. **Step 4:** Run → PASS.
 - [ ] **Step 5: Commit** `feat: app shell with five tabs and theming`
 
@@ -248,7 +262,7 @@ test('convert rounds half up, no truncation', () {
 - Test: `test/features/entry/entry_form_test.dart`
 
 **Interfaces:**
-- Consumes: `LedgerService` writes, providers.
+- Consumes: `LedgerService` add methods and `replaceTransaction`, providers.
 - Produces: `EntryFormScreen({String initialKind = 'expense', int? editTransactionId})`. Segmented control Expense / Income / Transfer. Fields: amount, account (currency shown), category (filtered by kind), date (default now), note; for transfer: to account, and when currencies differ a "Received" amount field plus an optional "Rate" field (filling one computes the other via `convert`, user may override). Save button label "Save" (brass fill). On `LedgerException` show the message under the related field; never close the screen on error. When editing, a "Delete" text action asks for confirmation.
 - [ ] **Step 1: Write failing widget tests:** saving "28" Food WeChat creates one expense; amount "0" shows an error and nothing is saved; transfer PKR→CNY with Received "122" saves 122.00 CNY; editing an existing entry and deleting it removes it after confirming.
 - [ ] **Step 2:** Run → FAIL. **Step 3:** Implement. **Step 4:** Run → PASS.
@@ -257,12 +271,14 @@ test('convert rounds half up, no truncation', () {
 ### Task 9: Wealth screen
 
 **Files:**
-- Create: `lib/features/wealth/wealth_screen.dart`, `lib/features/wealth/account_edit_sheet.dart`
+- Create: `lib/features/accounts/account_service.dart`, `lib/features/wealth/account_edit_sheet.dart`; Replace placeholder: `lib/features/wealth/wealth_screen.dart`
+- Test: `test/features/accounts/account_service_test.dart`
 - Test: `test/features/wealth/wealth_screen_test.dart`
 
 **Interfaces:**
 - Consumes: `watchBalances`, `watchWorth`, `mainCurrencyProvider`, `currencyColor`, `AmountText`.
 - Produces:
+  - `class AccountService { AccountService(AppDatabase db); Future<int> createAccount({required String name, required String currency, int openingMinor = 0, bool isCredit = false}); Future<void> renameAccount(int id, String name); Future<void> setOpeningBalance(int id, Money opening); Future<void> archiveAccount(int id); Future<void> unarchiveAccount(int id); }` throwing `LedgerException` codes `duplicate_name` (case-insensitive among non-archived), `unknown_currency`, `unknown_account`, `currency_mismatch` (opening balance currency). Provider `accountServiceProvider`. Unit tests for each method and error first, then the screen.
   - Header: label "Everything you have, in <currency name>" and total via `AmountText`. If `total == null`: show the main-currency subtotal with the line "Exchange rates aren't available yet. Connect to the internet to see your full total." If stale: small muted line "Rates from <date>".
   - Toggle Combined / By currency (local state). Combined: share bar by currency (currency colors) and groups. By currency: one total per currency, no conversion.
   - Groups per currency (name "Yuan", "Rupees", "Dollars", else code) with subtotal; accounts listed with balance; non-main groups show the converted subtotal in muted text.
@@ -289,12 +305,13 @@ test('convert rounds half up, no truncation', () {
 ### Task 11: Settings (minimum) and device check
 
 **Files:**
-- Create: `lib/features/settings/settings_screen.dart`
-- Test: `test/features/settings/settings_test.dart`
+- Create: `lib/features/categories/category_service.dart`; Replace placeholder: `lib/features/settings/settings_screen.dart`
+- Test: `test/features/categories/category_service_test.dart`, `test/features/settings/settings_test.dart`
 
 **Interfaces:**
-- Produces: Settings screen reachable from a gear icon in the Wealth and Spending headers, with main currency picker (CNY, PKR, USD) writing `Settings.mainCurrency`, and category management (add, rename, archive) for both kinds. Other settings arrive in later plans.
-- [ ] **Step 1: Write failing test:** switching main currency to PKR makes the Wealth header show "in rupees" and the total in PKR; renaming "Other" to "Misc" shows in the entry form.
+- Produces: `class CategoryService { CategoryService(AppDatabase db); Future<int> createCategory({required String name, required String kind, String iconKey = 'tag'}); Future<void> renameCategory(int id, String name); Future<void> archiveCategory(int id); }` throwing `LedgerException` `duplicate_name` (within the same kind), `unknown_category`. Archived categories disappear from pickers but stay on old entries. Provider `categoryServiceProvider`.
+- Settings screen reachable from a gear icon in the Wealth and Spending headers, with main currency picker (CNY, PKR, USD) writing `Settings.mainCurrency`, and category management (add, rename, archive) for both kinds. Other settings arrive in later plans.
+- [ ] **Step 1: Write failing test:** switching main currency to PKR makes the Wealth header show "in rupees" and the total in PKR; renaming the expense category "Other" to "Misc" shows in the expense picker of the entry form while the income "Other" is unchanged.
 - [ ] **Step 2:** Run → FAIL. **Step 3:** Implement. **Step 4:** Run → PASS.
 - [ ] **Step 5:** Run the full suite `flutter test` → all PASS, then `flutter build apk --release` and install on Rao's Android phone; check by hand: light and dark mode (switch phone theme), fonts render (not the default font), rates load on Wi-Fi in China, airplane mode shows the "aren't available yet" line on a fresh install.
 - [ ] **Step 6: Commit** `feat: settings for main currency and categories`
