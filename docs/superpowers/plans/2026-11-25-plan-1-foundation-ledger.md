@@ -86,12 +86,12 @@ test/...                             mirrors lib/
 **Interfaces:**
 - Produces: a building Android app with all dependencies resolved and fonts registered as families `Bricolage` and `Instrument`.
 
-- [ ] **Step 1:** In the existing repository root (already a git repo with `docs/` and `AGENTS.md`; do not run `git init`), run `flutter create --org com.rao --project-name budget_app --platforms android,ios .` Then set the display name: `android:label="Hazir"` in `android/app/src/main/AndroidManifest.xml`, `CFBundleDisplayName` = `Hazir` in `ios/Runner/Info.plist`, and `title: 'Hazir'` on the MaterialApp.
-- [ ] **Step 2:** Add dependencies: `flutter pub add flutter_riverpod go_router drift drift_flutter fl_chart dio decimal intl phosphor_flutter path_provider` and `flutter pub add --dev drift_dev build_runner`.
-- [ ] **Step 3:** Download the two variable fonts (OFL) from their official GitHub releases or Google Fonts website into `assets/fonts/`, add their `OFL.txt` files next to them, and register them in `pubspec.yaml` under `flutter: fonts:` as families `Bricolage` and `Instrument`.
-- [ ] **Step 4: Write smoke test** `test/smoke_test.dart`: pump `const ProviderScope(child: BudgetApp())` and `expect(find.byType(MaterialApp), findsOneWidget)`. (`BudgetApp` can be a bare `MaterialApp` for now in `lib/app/app.dart`.)
-- [ ] **Step 5:** Run `flutter test test/smoke_test.dart` → PASS. Run `flutter build apk --debug` → succeeds.
-- [ ] **Step 6: Commit** `chore: create flutter project with dependencies and fonts`
+- [x] **Step 1:** In the existing repository root (already a git repo with `docs/` and `AGENTS.md`; do not run `git init`), run `flutter create --org com.rao --project-name budget_app --platforms android,ios .` Then set the display name: `android:label="Hazir"` in `android/app/src/main/AndroidManifest.xml`, `CFBundleDisplayName` = `Hazir` in `ios/Runner/Info.plist`, and `title: 'Hazir'` on the MaterialApp.
+- [x] **Step 2:** Add dependencies: `flutter pub add flutter_riverpod go_router drift drift_flutter fl_chart dio decimal intl phosphor_flutter path_provider` and `flutter pub add --dev drift_dev build_runner`.
+- [x] **Step 3:** Download the two variable fonts (OFL) from their official GitHub releases or Google Fonts website into `assets/fonts/`, add their `OFL.txt` files next to them, and register them in `pubspec.yaml` under `flutter: fonts:` as families `Bricolage` and `Instrument`.
+- [x] **Step 4: Write smoke test** `test/smoke_test.dart`: pump `const ProviderScope(child: BudgetApp())` and `expect(find.byType(MaterialApp), findsOneWidget)`. (`BudgetApp` can be a bare `MaterialApp` for now in `lib/app/app.dart`.)
+- [x] **Step 5:** Run `flutter test test/smoke_test.dart` → PASS. Run `flutter build apk --debug` → succeeds.
+- [x] **Step 6: Commit** `chore: create flutter project with dependencies and fonts`
 
 ### Task 2: Money core
 
