@@ -230,11 +230,11 @@ test('convert rounds half up, no truncation', () {
   - `ThemeData buildTheme(Brightness b)`: Material 3, `scaffoldBackgroundColor` ground, text theme in `Instrument`, extension `AppColors`.
   - `AmountText(Money m, {double size = 44, bool showDecimals = true, bool signed = false})`: `Bricolage` font, `FontFeature.tabularFigures()`, width axis 80 (`FontVariation('wdth', 80)`), symbol at half size raised, decimals in muted color at half size.
 
-- [ ] **Step 1: Write failing tests:** `AppColors.light.brass == AppColors.dark.brass`; contrast ratio (write a small `contrast(Color a, Color b)` helper in the test) of ink and muted on ground and surface ≥ 4.5 in both themes; `buildTheme(Brightness.dark).extension<AppColors>()!.ground == Color(0xFF0E1613)`.
-- [ ] **Step 2:** Run → FAIL.
-- [ ] **Step 3:** Implement. If any muted pair fails 4.5, darken (light) or lighten (dark) that muted value minimally and note the new hex in the commit message.
-- [ ] **Step 4:** Run → PASS.
-- [ ] **Step 5: Commit** `feat: design tokens, themes and amount text`
+- [x] **Step 1: Write failing tests:** `AppColors.light.brass == AppColors.dark.brass`; contrast ratio (write a small `contrast(Color a, Color b)` helper in the test) of ink and muted on ground and surface ≥ 4.5 in both themes; `buildTheme(Brightness.dark).extension<AppColors>()!.ground == Color(0xFF0E1613)`.
+- [x] **Step 2:** Run → FAIL.
+- [x] **Step 3:** Implement. If any muted pair fails 4.5, darken (light) or lighten (dark) that muted value minimally and note the new hex in the commit message.
+- [x] **Step 4:** Run → PASS.
+- [x] **Step 5: Commit** `feat: design tokens, themes and amount text`
 
 ### Task 7: App shell and navigation
 
