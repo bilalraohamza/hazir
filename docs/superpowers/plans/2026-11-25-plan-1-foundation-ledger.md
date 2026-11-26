@@ -264,9 +264,9 @@ test('convert rounds half up, no truncation', () {
 **Interfaces:**
 - Consumes: `LedgerService` add methods and `replaceTransaction`, providers.
 - Produces: `EntryFormScreen({String initialKind = 'expense', int? editTransactionId})`. Segmented control Expense / Income / Transfer. Fields: amount, account (currency shown), category (filtered by kind), date (default now), note; for transfer: to account, and when currencies differ a "Received" amount field plus an optional "Rate" field (filling one computes the other via `convert`, user may override). Save button label "Save" (brass fill). On `LedgerException` show the message under the related field; never close the screen on error. When editing, a "Delete" text action asks for confirmation.
-- [ ] **Step 1: Write failing widget tests:** saving "28" Food WeChat creates one expense; amount "0" shows an error and nothing is saved; transfer PKR→CNY with Received "122" saves 122.00 CNY; editing an existing entry and deleting it removes it after confirming.
-- [ ] **Step 2:** Run → FAIL. **Step 3:** Implement. **Step 4:** Run → PASS.
-- [ ] **Step 5: Commit** `feat: manual entry form for expense, income and transfer`
+- [x] **Step 1: Write failing widget tests:** saving "28" Food WeChat creates one expense; amount "0" shows an error and nothing is saved; transfer PKR→CNY with Received "122" saves 122.00 CNY; editing an existing entry and deleting it removes it after confirming.
+- [x] **Step 2:** Run → FAIL. **Step 3:** Implement. **Step 4:** Run → PASS.
+- [x] **Step 5: Commit** `feat: manual entry form for expense, income and transfer`
 
 ### Task 9: Wealth screen
 

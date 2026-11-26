@@ -57,6 +57,7 @@ GoRouter buildRouter() => GoRouter(
       builder: (_, state) {
         final kind = state.uri.queryParameters['kind'];
         return EntryFormScreen(
+          key: ValueKey(kind),
           initialKind: kind == 'income' || kind == 'transfer'
               ? kind!
               : 'expense',
