@@ -148,7 +148,40 @@ void main() {
         ),
       );
       expect(find.bySemanticsLabel('−₨28'), findsOneWidget);
-      expect(find.text('₨'), findsOneWidget);
+      expect(find.text('−₨'), findsOneWidget);
     },
   );
+
+  testWidgets('small amounts keep the signed symbol inline and mute zeros', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Brightness.light),
+        home: const Scaffold(
+          body: Column(
+            children: [
+              AmountText(Money(-2800, 'CNY'), size: 16),
+              AmountText(Money(0, 'CNY'), size: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+    final spans = tester
+        .widgetList<Text>(
+          find.descendant(
+            of: find.byType(AmountText),
+            matching: find.byType(Text),
+          ),
+        )
+        .map((t) => t.textSpan! as TextSpan)
+        .toList();
+    final negative = spans.first;
+    expect(negative.toPlainText(), '−¥28.00');
+    expect(negative.style!.fontSize, 16);
+    expect(negative.children!.whereType<WidgetSpan>(), isEmpty);
+    expect(negative.children!.last.style!.color, AppColors.light.muted);
+    expect(spans.last.style!.color, AppColors.light.muted);
+  });
 }

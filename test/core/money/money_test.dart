@@ -3,6 +3,16 @@ import 'package:budget_app/core/money/money.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    'negative formatting uses a real minus and supports editable round trips',
+    () {
+      const money = Money(-2800, 'CNY');
+      expect(formatMoney(money), '−¥28.00');
+      expect(formatMoney(money, withSymbol: false), '−28.00');
+      expect(Money.parse(formatMoney(money, withSymbol: false), 'CNY'), money);
+      expect(Money.parse('-28.00', 'CNY'), money);
+    },
+  );
   test('parse and format', () {
     expect(Money.parse('28', 'CNY').minor, 2800);
     expect(Money.parse('28.5', 'CNY').minor, 2850);

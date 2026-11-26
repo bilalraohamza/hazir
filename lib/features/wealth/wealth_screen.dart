@@ -67,7 +67,9 @@ class _WealthScreenState extends ConsumerState<WealthScreen> {
         title: currency == null
             ? null
             : Text(
-                'Everything you have, in ${_currencyName(currency)}',
+                combined
+                    ? 'Everything you have, in ${_currencyName(currency)}'
+                    : 'Everything you have',
                 style: muted,
               ),
         actions: [
@@ -118,48 +120,66 @@ class _WealthScreenState extends ConsumerState<WealthScreen> {
           padding: const EdgeInsets.fromLTRB(18, 0, 18, 4),
           sliver: SliverList.list(
             children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: AmountText(
-                    total ?? subtotal,
-                    key: const Key('wealth-total'),
-                    size: 44,
-                    showDecimals: false,
+              if (combined) ...[
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: AmountText(
+                      total ?? subtotal,
+                      key: const Key('wealth-total'),
+                      size: 44,
+                      showDecimals: false,
+                    ),
                   ),
                 ),
-              ),
-              if (worth.ratesMissing)
-                Padding(
-                  padding: const EdgeInsets.only(top: 5),
-                  child: Text(
-                    "Exchange rates aren't available yet. Connect to the internet to see your full total.",
+                if (worth.ratesMissing)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 5),
+                    child: Text(
+                      "Exchange rates aren't available yet. Connect to the internet to see your full total.",
+                      style: muted,
+                    ),
+                  )
+                else if (worth.ratesStale && worth.snapshotDay != null)
+                  Text(
+                    'Rates from ${DateFormat('d MMM y').format(DateTime.parse(worth.snapshotDay!))}',
                     style: muted,
                   ),
-                )
-              else if (worth.ratesStale && worth.snapshotDay != null)
-                Text(
-                  'Rates from ${DateFormat('d MMM y').format(DateTime.parse(worth.snapshotDay!))}',
-                  style: muted,
-                ),
+              ] else
+                for (final code in currencies)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _currencyName(code, upper: true),
+                          style: text.titleSmall!.copyWith(
+                            color: currencyColor(colors, code),
+                          ),
+                        ),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: AmountText(
+                              worth.byCurrency[code]!,
+                              key: ValueKey('wealth-total-$code'),
+                              size: 32,
+                              showDecimals: false,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
               const SizedBox(height: 16),
               toggle(),
               if (combined && total != null) ...[
                 const SizedBox(height: 14),
                 shareBar(currencies, worth.convertedByCurrency),
               ],
-              if (!combined)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Column(
-                    children: [
-                      for (final code in currencies)
-                        currencySubtotal(code, worth.byCurrency[code]!),
-                      rule(),
-                    ],
-                  ),
-                ),
               for (final code in currencies)
                 currencyGroup(
                   code,
@@ -310,7 +330,7 @@ class _WealthScreenState extends ConsumerState<WealthScreen> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 AmountText(subtotal, size: 18),
-                if (converted != null)
+                if (converted != null && converted.minor != 0)
                   Text(
                     '≈ ${formatMoney(converted)}',
                     style: amountNumberStyle(colors.muted, 12),

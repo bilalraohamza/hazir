@@ -11,12 +11,14 @@ class AmountText extends StatelessWidget {
     this.size = 44,
     this.showDecimals = true,
     this.signed = false,
+    this.hero,
   });
 
   final Money m;
   final double size;
   final bool showDecimals;
   final bool signed;
+  final bool? hero;
 
   @override
   Widget build(BuildContext context) {
@@ -33,8 +35,12 @@ class AmountText extends StatelessWidget {
     final digits = formatted.substring(symbolStart + symbol.length).split('.');
     final decimals = showDecimals && digits.length > 1 ? '.${digits[1]}' : '';
 
-    final style = amountNumberStyle(colors.ink, size);
+    final style = amountNumberStyle(
+      m.minor == 0 ? colors.muted : colors.ink,
+      size,
+    );
     final small = style.copyWith(fontSize: size / 2);
+    final raiseSymbol = hero ?? size >= 24;
 
     return Semantics(
       label: '$sign$symbol${digits.first}$decimals',
@@ -43,11 +49,13 @@ class AmountText extends StatelessWidget {
         TextSpan(
           style: style,
           children: [
-            if (sign.isNotEmpty) TextSpan(text: sign),
-            WidgetSpan(
-              alignment: PlaceholderAlignment.top,
-              child: Text(symbol, style: small),
-            ),
+            if (raiseSymbol)
+              WidgetSpan(
+                alignment: PlaceholderAlignment.top,
+                child: Text('$sign$symbol', style: small),
+              )
+            else
+              TextSpan(text: '$sign$symbol'),
             TextSpan(text: digits.first),
             if (decimals.isNotEmpty)
               TextSpan(

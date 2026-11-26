@@ -16,7 +16,7 @@ class Money {
 
   static Money parse(String text, String currency) {
     final digits = currencyOf(currency).minorDigits;
-    final input = text.trim();
+    final input = text.trim().replaceFirst(RegExp(r'^−'), '-');
     final match = _amount.firstMatch(input);
     if (match == null || (match.group(1)?.length ?? 0) > digits) {
       throw FormatException('Invalid amount for $currency', text);
@@ -63,9 +63,7 @@ String formatMoney(Money m, {bool withSymbol = true, bool signed = false}) {
   final amount = Decimal.fromInt(m.minor).abs().shift(-currency.minorDigits);
   final parts = amount.toStringAsFixed(currency.minorDigits).split('.');
   parts[0] = parts[0].replaceAll(RegExp(r'\B(?=(?:[0-9]{3})+$)'), ',');
-  final sign = m.isNegative
-      ? (signed ? '−' : '-')
-      : (signed && m.minor > 0 ? '+' : '');
+  final sign = m.isNegative ? '−' : (signed && m.minor > 0 ? '+' : '');
   final symbol = withSymbol ? currency.symbol : '';
   return '$sign$symbol${parts.join('.')}';
 }

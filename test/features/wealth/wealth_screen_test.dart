@@ -92,7 +92,14 @@ void main() {
     expect(find.byKey(const Key('currency-share-bar')), findsNothing);
     await tester.tap(find.text('By currency'));
     await tester.pumpAndSettle();
-    expect(amount(const Money(5000000, 'PKR')), findsWidgets);
+    expect(find.byKey(const Key('wealth-total')), findsNothing);
+    expect(find.text(missingRates), findsNothing);
+    final nativeTotal = tester.widget<AmountText>(
+      find.byKey(const ValueKey('wealth-total-PKR')),
+    );
+    expect(nativeTotal.m, const Money(5000000, 'PKR'));
+    expect(nativeTotal.size, 32);
+    expect(find.textContaining('≈'), findsNothing);
   });
 
   testWidgets('adding Huabei in the account sheet updates the Yuan group', (
@@ -196,6 +203,7 @@ void main() {
       12000,
     );
     expect(find.text('Rates from 26 Nov 2026'), findsOneWidget);
+    expect(find.text('≈ ¥0.00'), findsNothing);
     expect(find.byKey(const Key('currency-share-bar')), findsOneWidget);
     final accounts = providers(tester).read(accountServiceProvider);
     await waitFor(tester, accounts.archiveAccount(5));
