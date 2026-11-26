@@ -291,9 +291,9 @@ test('convert rounds half up, no truncation', () {
   - Attribution line at the bottom: "Rates by ExchangeRate-API".
   - Tap an account → `AccountEditSheet` (rename, archive, opening balance). "Add account" action: name, currency (CNY, PKR, USD), opening balance. Archived accounts are hidden from the groups and listed under a collapsed "Archived" section; their balances still count in totals.
   - Worth history chart and exchange-rate effect are NOT in this plan (need snapshots over time; plan 5 polish).
-- [ ] **Step 1: Write failing widget tests:** seeded data with a WeChat expense shows "Yuan" group and the right WeChat balance; with no snapshots and a PKR balance the "aren't available yet" line appears and no combined total is shown; adding an account "Huabei" CNY makes it appear in the Yuan group.
-- [ ] **Step 2:** Run → FAIL. **Step 3:** Implement. **Step 4:** Run → PASS.
-- [ ] **Step 5: Commit** `feat: wealth screen with currency groups and account management`
+- [x] **Step 1: Write failing widget tests:** seeded data with a WeChat expense shows "Yuan" group and the right WeChat balance; with no snapshots and a PKR balance the "aren't available yet" line appears and no combined total is shown; adding an account "Huabei" CNY makes it appear in the Yuan group.
+- [x] **Step 2:** Run → FAIL. **Step 3:** Implement. **Step 4:** Run → PASS.
+- [x] **Step 5: Commit** `feat: wealth screen with currency groups and account management`
 
 ### Task 10: Spending screen
 

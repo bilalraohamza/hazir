@@ -32,6 +32,8 @@ class FxService {
     return await snapshotDayFor(now) != _localDay(now);
   }
 
+  Future<String?> latestSnapshotDay() => snapshotDayFor(_clock());
+
   Future<Decimal?> rate(String from, String to, {DateTime? on}) async {
     if (from == to) return Decimal.one;
     final day = await snapshotDayFor(on ?? _clock());

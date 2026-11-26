@@ -43,12 +43,16 @@ class WorthSummary {
     this.total,
     this.byCurrency,
     this.ratesMissing,
-    this.ratesStale,
-  );
+    this.ratesStale, {
+    this.convertedByCurrency = const {},
+    this.snapshotDay,
+  });
   final Money? total;
   final Map<String, Money> byCurrency;
   final bool ratesMissing;
   final bool ratesStale;
+  final Map<String, Money> convertedByCurrency;
+  final String? snapshotDay;
 }
 
 class CategorySpend {
@@ -321,22 +325,29 @@ class LedgerService {
       SELECT currency, SUM(minor) AS balance FROM movements GROUP BY currency
     ''').get();
     final byCurrency = <String, Money>{};
+    final converted = <String, Money>{};
+    final snapshotDay = await _fx.latestSnapshotDay();
     var total = Money(0, main);
     var missing = false;
     for (final row in rows) {
       final currency = row.read<String>('currency');
       final amount = Money(row.read<int>('balance'), currency);
       byCurrency[currency] = amount;
-      if (amount.minor == 0) continue;
-      if (currency == main) {
-        total += amount;
+      if (currency == main || amount.minor == 0) {
+        final subtotal = Money(amount.minor, main);
+        converted[currency] = subtotal;
+        total += subtotal;
+        continue;
+      }
+      final rate = snapshotDay == null
+          ? null
+          : await _fx.rateForDay(currency, main, snapshotDay);
+      if (rate == null) {
+        missing = true;
       } else {
-        final rate = await _fx.rate(currency, main);
-        if (rate == null) {
-          missing = true;
-        } else {
-          total += convert(amount, rate, main);
-        }
+        final subtotal = convert(amount, rate, main);
+        converted[currency] = subtotal;
+        total += subtotal;
       }
     }
     return WorthSummary(
@@ -344,6 +355,8 @@ class LedgerService {
       byCurrency,
       missing,
       await _fx.isStale(),
+      convertedByCurrency: converted,
+      snapshotDay: snapshotDay,
     );
   });
 
