@@ -523,6 +523,7 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
                   key: const Key('Amount'),
                   controller: amount,
                   autofocus: true,
+                  cursorHeight: 52,
                   style: style,
                   decoration: InputDecoration.collapsed(
                     hintText: '0',
@@ -665,35 +666,44 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
                 ),
               ),
               Text('at ', style: muted),
-              Flexible(
-                child: editingRate
-                    ? TextField(
-                        key: const Key('Rate'),
-                        focusNode: rateFocus,
-                        autofocus: true,
-                        controller: rate,
-                        textAlign: TextAlign.end,
-                        style: amountNumberStyle(colors.ink, 18),
-                        decoration: plain('Rate'),
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        onChanged: (_) => change(() {
-                          rateEdited = true;
-                          syncConversion();
-                        }),
-                      )
-                    : InkWell(
-                        onTap: () => setState(() => editingRate = true),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: Text(
-                            displayRate.isEmpty ? 'Rate' : displayRate,
-                            style: amountNumberStyle(colors.ink, 18),
-                          ),
+              if (editingRate)
+                SizedBox(
+                  width: 100,
+                  child: TextField(
+                    key: const Key('Rate'),
+                    focusNode: rateFocus,
+                    autofocus: true,
+                    controller: rate,
+                    textAlign: TextAlign.end,
+                    style: amountNumberStyle(colors.ink, 18),
+                    decoration: plain('Rate'),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    onChanged: (_) => change(() {
+                      rateEdited = true;
+                      syncConversion();
+                    }),
+                  ),
+                )
+              else
+                InkWell(
+                  onTap: () => setState(() => editingRate = true),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 100),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          displayRate.isEmpty ? 'Rate' : displayRate,
+                          style: amountNumberStyle(colors.ink, 18),
                         ),
                       ),
-              ),
+                    ),
+                  ),
+                ),
             ],
           ),
           FutureBuilder<Decimal?>(
