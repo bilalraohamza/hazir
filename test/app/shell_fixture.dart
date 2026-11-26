@@ -31,11 +31,11 @@ class ShellFixture {
   final api = PendingRatesApi();
   DateTime now = DateTime(2026, 11, 26);
 
-  Widget build() => ProviderScope(
+  Widget build({Widget child = const BudgetApp()}) => ProviderScope(
     overrides: [
       databaseProvider.overrideWithValue(db),
       fxServiceProvider.overrideWithValue(FxService(db, api, clock: () => now)),
     ],
-    child: const BudgetApp(),
+    child: child,
   );
 }

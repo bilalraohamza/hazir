@@ -303,10 +303,11 @@ test('convert rounds half up, no truncation', () {
 
 **Interfaces:**
 - Consumes: `watchSpending(month)`, `watchEntries`, `EntryFormScreen` for edit.
-- Produces: month picker (previous / next arrows, label "November 2026"), total spent this month via `AmountText`, a donut chart (`fl_chart` PieChart) of the top 6 categories with the rest grouped as "Other categories", then the category list (icon, name, count, total). Tap a category → `CategoryEntriesScreen` listing entries (date, note or account, amount signed); tap an entry → edit form. Empty month: "No spending recorded in <month>." with a "+ Add expense" button.
-- [ ] **Step 1: Write failing widget tests:** two Food and one Transport expense in November show Food first with count 2; switching to December shows the empty message; editing a Food entry amount in the entries list updates the category total on return.
-- [ ] **Step 2:** Run → FAIL. **Step 3:** Implement. **Step 4:** Run → PASS.
-- [ ] **Step 5: Commit** `feat: spending screen with monthly categories and entries`
+- Produces: month picker (previous / next arrows, label "November 2026"), total spent this month via `AmountText`, and a category list (icon, name, count, total, share bar). Tap a category → `CategoryEntriesScreen` listing entries (date, note or account, amount signed); tap an entry → edit form. Empty month: "No spending recorded in <month>." with an "Add expense" button.
+- Design change: per-category share bars replace the donut chart.
+- [x] **Step 1: Write failing widget tests:** two Food and one Transport expense in November show Food first with count 2; switching to December shows the empty message; editing a Food entry amount in the entries list updates the category total on return.
+- [x] **Step 2:** Run → FAIL. **Step 3:** Implement. **Step 4:** Run → PASS.
+- [x] **Step 5: Commit** `feat: spending screen with monthly categories and entries`
 
 ### Task 11: Settings (minimum) and device check
 
