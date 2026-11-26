@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/db/app_database.dart';
 import '../features/accounts/account_service.dart';
+import '../features/categories/category_service.dart';
 import '../features/fx/fx_service.dart';
 import '../features/fx/rates_api.dart';
 import '../features/ledger/ledger_service.dart';
@@ -19,6 +20,10 @@ final fxServiceProvider = Provider<FxService>(
 
 final accountServiceProvider = Provider<AccountService>(
   (ref) => AccountService(ref.watch(databaseProvider)),
+);
+
+final categoryServiceProvider = Provider<CategoryService>(
+  (ref) => CategoryService(ref.watch(databaseProvider)),
 );
 
 final ledgerServiceProvider = Provider<LedgerService>(

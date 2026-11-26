@@ -8,6 +8,7 @@ import '../../app/providers.dart';
 import '../../core/money/money.dart';
 import '../../ui/theme/app_colors.dart';
 import '../../ui/widgets/amount_text.dart';
+import '../../ui/widgets/category_icons.dart';
 import '../entry/entry_form_screen.dart';
 import '../ledger/ledger_service.dart';
 import 'category_entries_screen.dart';
@@ -205,8 +206,7 @@ class _SpendingScreenState extends ConsumerState<SpendingScreen> {
           child: Row(
             children: [
               PhosphorIcon(
-                categoryIcons[item.category.iconKey] ??
-                    PhosphorIconsDuotone.tag,
+                categoryIcon(item.category.iconKey),
                 size: 24,
                 color: colors.muted,
                 duotoneSecondaryColor: colors.muted,

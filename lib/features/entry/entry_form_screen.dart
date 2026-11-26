@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../ui/widgets/amount_text.dart';
+import '../../ui/widgets/category_icons.dart';
 
 import 'package:decimal/decimal.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -562,7 +563,7 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
         for (final c in visible)
           tile(
             c.name,
-            categoryIcons[c.iconKey] ?? PhosphorIconsDuotone.tag,
+            categoryIcon(c.iconKey),
             c.id == category,
             () => change(() => category = c.id),
           ),
@@ -862,22 +863,3 @@ class _AmountController extends TextEditingController {
     );
   }
 }
-
-const categoryIcons = {
-  'forkKnife': PhosphorIconsDuotone.forkKnife,
-  'shoppingCart': PhosphorIconsDuotone.shoppingCart,
-  'bus': PhosphorIconsDuotone.bus,
-  'house': PhosphorIconsDuotone.house,
-  'receipt': PhosphorIconsDuotone.receipt,
-  'shoppingBag': PhosphorIconsDuotone.shoppingBag,
-  'bookOpen': PhosphorIconsDuotone.bookOpen,
-  'firstAidKit': PhosphorIconsDuotone.firstAidKit,
-  'filmStrip': PhosphorIconsDuotone.filmStrip,
-  'gift': PhosphorIconsDuotone.gift,
-  'paperPlaneTilt': PhosphorIconsDuotone.paperPlaneTilt,
-  'dotsThree': PhosphorIconsDuotone.dotsThree,
-  'graduationCap': PhosphorIconsDuotone.graduationCap,
-  'users': PhosphorIconsDuotone.users,
-  'briefcase': PhosphorIconsDuotone.briefcase,
-  'arrowUUpLeft': PhosphorIconsDuotone.arrowUUpLeft,
-};

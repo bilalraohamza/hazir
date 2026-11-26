@@ -318,7 +318,7 @@ test('convert rounds half up, no truncation', () {
 **Interfaces:**
 - Produces: `class CategoryService { CategoryService(AppDatabase db); Future<int> createCategory({required String name, required String kind, String iconKey = 'tag'}); Future<void> renameCategory(int id, String name); Future<void> archiveCategory(int id); }` throwing `LedgerException` `duplicate_name` (within the same kind), `unknown_category`. Archived categories disappear from pickers but stay on old entries. Provider `categoryServiceProvider`.
 - Settings screen reachable from a gear icon in the Wealth and Spending headers, with main currency picker (CNY, PKR, USD) writing `Settings.mainCurrency`, and category management (add, rename, archive) for both kinds. Other settings arrive in later plans.
-- [ ] **Step 1: Write failing test:** switching main currency to PKR makes the Wealth header show "in rupees" and the total in PKR; renaming the expense category "Other" to "Misc" shows in the expense picker of the entry form while the income "Other" is unchanged.
-- [ ] **Step 2:** Run → FAIL. **Step 3:** Implement. **Step 4:** Run → PASS.
+- [x] **Step 1: Write failing test:** switching main currency to PKR makes the Wealth header show "in rupees" and the total in PKR; renaming the expense category "Other" to "Misc" shows in the expense picker of the entry form while the income "Other" is unchanged.
+- [x] **Step 2:** Run → FAIL. **Step 3:** Implement. **Step 4:** Run → PASS.
 - [ ] **Step 5:** Run the full suite `flutter test` → all PASS, then `flutter build apk --release` and install on Rao's Android phone; check by hand: light and dark mode (switch phone theme), fonts render (not the default font), rates load on Wi-Fi in China, airplane mode shows the "aren't available yet" line on a fresh install.
-- [ ] **Step 6: Commit** `feat: settings for main currency and categories`
+- [x] **Step 6: Commit** `feat: settings for main currency and categories`
