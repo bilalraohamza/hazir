@@ -427,7 +427,7 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
             child: Align(alignment: Alignment.centerRight, child: value),
           ),
           if (tap != null)
-            icon(PhosphorIconsDuotone.caretRight, colors.muted, 16),
+            icon(PhosphorIconsRegular.caretRight, colors.muted, 16),
         ],
       ),
     ),
@@ -735,7 +735,7 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
       leading: IconButton(
         tooltip: 'Close',
         onPressed: busy ? null : finish,
-        icon: icon(PhosphorIconsDuotone.x, colors.ink),
+        icon: icon(PhosphorIconsRegular.x, colors.ink),
       ),
       title: Text(
         widget.editTransactionId == null ? 'New entry' : 'Edit entry',
