@@ -49,3 +49,4 @@ app.*.map.json
 *.env
 *.csv
 /backups/
+/packages/phosphor_flutter/pubspec.lock

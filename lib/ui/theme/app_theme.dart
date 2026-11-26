@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'app_colors.dart';
@@ -39,6 +40,18 @@ ThemeData buildTheme(Brightness b) {
     colorScheme: scheme,
     extensions: [c],
     scaffoldBackgroundColor: c.ground,
+    appBarTheme: AppBarThemeData(
+      backgroundColor: c.ground,
+      foregroundColor: c.ink,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      surfaceTintColor: c.ground.withValues(alpha: 0),
+      systemOverlayStyle: SystemUiOverlayStyle(
+        statusBarColor: c.ground,
+        statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: b,
+      ),
+    ),
     canvasColor: c.ground,
     primaryColorLight: c.surface,
     primaryColorDark: c.onBrass,

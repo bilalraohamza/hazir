@@ -2,6 +2,8 @@ import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
+import '../theme/app_colors.dart';
+
 class PlaceholderTab extends StatelessWidget {
   const PlaceholderTab(
     this.title, {
@@ -22,7 +24,14 @@ class PlaceholderTab extends StatelessWidget {
           IconButton(
             tooltip: 'Settings',
             onPressed: () => context.push('/settings'),
-            icon: const PhosphorIcon(PhosphorIconsDuotone.gear),
+            icon: PhosphorIcon(
+              PhosphorIconsDuotone.gearSix,
+              color: Theme.of(context).extension<AppColors>()!.muted,
+              duotoneSecondaryColor: Theme.of(context)
+                  .extension<AppColors>()!
+                  .muted,
+              duotoneSecondaryOpacity: .2,
+            ),
           ),
       ],
     ),

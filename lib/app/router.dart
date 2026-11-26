@@ -75,7 +75,8 @@ class _TabBar extends StatelessWidget {
     final theme = Theme.of(context);
     final c = theme.extension<AppColors>()!;
     return Material(
-      color: c.surface,
+      color: c.ground,
+      shape: Border(top: BorderSide(color: c.rule)),
       child: SafeArea(
         top: false,
         child: Row(
