@@ -15,13 +15,32 @@ void main() {
     addTearDown(fixture.db.close);
   });
 
-  Future<void> open(WidgetTester t, {bool editing = false}) async {
+  Future<void> open(
+    WidgetTester t, {
+    bool editing = false,
+    bool history = false,
+  }) async {
     await t.binding.setSurfaceSize(const Size(430, 1000));
     addTearDown(() => t.binding.setSurfaceSize(null));
     await t.pumpWidget(fixture.build());
     await t.pumpAndSettle();
     await t.tap(find.text('Chat'));
     await t.pumpAndSettle();
+    if (history) {
+      final ledger = ProviderScope.containerOf(
+        t.element(find.byTooltip('Add entry')),
+      ).read(ledgerServiceProvider);
+      for (final id in [8, 8, 3]) {
+        final insert = ledger.addExpense(
+          accountId: 1,
+          categoryId: id,
+          amount: const Money(100, 'CNY'),
+          at: DateTime.now().subtract(const Duration(days: 2)),
+        );
+        await t.pumpAndSettle();
+        await insert;
+      }
+    }
     if (editing) {
       final context = t.element(find.byTooltip('Add entry'));
       final ledger = ProviderScope.containerOf(context)
@@ -56,6 +75,7 @@ void main() {
   Future<void> tap(WidgetTester t, String label) async {
     final item = find.text(label).last;
     await t.ensureVisible(item);
+    await t.pumpAndSettle();
     await t.tap(item);
     await t.pumpAndSettle();
   }
@@ -89,10 +109,7 @@ void main() {
       final amount = find.byKey(const Key('Amount'));
       await t.enterText(amount, '1.2.3');
       await tap(t, 'Save');
-      expect(
-        t.widget<TextField>(amount).decoration!.errorText,
-        'Invalid amount for CNY',
-      );
+      expect(find.text('Invalid amount for CNY'), findsOneWidget);
       expect(await rows(t), isEmpty);
       await t.enterText(amount, '7.25');
       await tap(t, 'Save');
@@ -111,19 +128,18 @@ void main() {
       await tap(t, 'Transfer');
       expect(find.byKey(const Key('Received')), findsNothing);
       expect(find.byKey(const Key('Rate')), findsNothing);
-      await tap(t, 'WeChat, CNY');
+      await tap(t, 'From');
       await tap(t, 'Pakistani bank, PKR');
       await t.enterText(find.byKey(const Key('Amount')), '5000');
+      await tap(t, 'Rate');
       await t.enterText(find.byKey(const Key('Rate')), '0.025');
       expect(
         t.widget<TextField>(find.byKey(const Key('Received'))).controller!.text,
         '125.00',
       );
       await t.enterText(find.byKey(const Key('Received')), '122');
-      expect(
-        t.widget<TextField>(find.byKey(const Key('Rate'))).controller!.text,
-        '0.0244',
-      );
+      await t.pumpAndSettle();
+      expect(find.text('0.0244'), findsOneWidget);
       await tap(t, 'Save');
       final row = (await rows(t)).single;
       expect(
@@ -152,4 +168,52 @@ void main() {
     await tap(t, 'Delete');
     expect(await rows(t), isEmpty);
   });
+
+  testWidgets('More brings a selected category into the grid', (t) async {
+    await open(t);
+    expect(find.text('Gifts'), findsNothing);
+    await tap(t, 'More');
+    await t.drag(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.byType(ListView),
+      ),
+      const Offset(0, -300),
+    );
+    await t.pumpAndSettle();
+    await tap(t, 'Gifts');
+    expect(find.text('Gifts'), findsOneWidget);
+    await t.enterText(find.byKey(const Key('Amount')), '1');
+    await tap(t, 'Save');
+    expect((await rows(t)).single.categoryId, 10);
+  });
+  testWidgets('recent category use ranks grid tiles before starter order', (
+    t,
+  ) async {
+    await open(t, history: true);
+    final labels = t
+        .widgetList<Text>(
+          find.descendant(
+            of: find.byType(GridView),
+            matching: find.byType(Text),
+          ),
+        )
+        .map((w) => w.data);
+    expect(labels.take(3), ['Health', 'Transport', 'Food']);
+  });
+  testWidgets(
+    'transfer card rounds the displayed rate and hides an unavailable quote',
+    (t) async {
+      await open(t);
+      await tap(t, 'Transfer');
+      await tap(t, 'From');
+      await tap(t, 'Pakistani bank, PKR');
+      await t.enterText(find.byKey(const Key('Amount')), '3');
+      await t.enterText(find.byKey(const Key('Received')), '2');
+      await t.pumpAndSettle();
+      expect(find.text('Alipay receives'), findsOneWidget);
+      expect(find.text('0.666667'), findsOneWidget);
+      expect(find.textContaining("Today's rate would give"), findsNothing);
+    },
+  );
 }

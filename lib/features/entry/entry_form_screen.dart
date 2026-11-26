@@ -1,3 +1,9 @@
+import 'package:drift/drift.dart' show Variable;
+import 'package:intl/intl.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
+
+import '../../ui/widgets/amount_text.dart';
+
 import 'package:decimal/decimal.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
@@ -33,6 +39,11 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
   late String kind;
   List<Account> accounts = [];
   List<Category> categories = [];
+  final usage = <int, int>{};
+  late Future<Decimal?> quote;
+  (String, String, DateTime)? quoteKey;
+  final rateFocus = FocusNode();
+  bool editingRate = false;
   int? source, destination, category;
   DateTime date = DateTime.now();
   bool busy = false, rateEdited = false;
@@ -50,6 +61,9 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
   void initState() {
     super.initState();
     kind = widget.initialKind;
+    rateFocus.addListener(() {
+      if (!rateFocus.hasFocus && mounted) setState(() => editingRate = false);
+    });
     loading = load();
   }
 
@@ -63,6 +77,20 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
       db.categories,
     )..where((c) => c.archived.equals(false))).get();
     if (!mounted) return;
+    final now = DateTime.now();
+    final counts = await db
+        .customSelect(
+          'SELECT category_id, COUNT(*) AS uses FROM transactions WHERE category_id IS NOT NULL AND occurred_at BETWEEN ? AND ? GROUP BY category_id',
+          variables: [
+            Variable.withDateTime(now.subtract(const Duration(days: 90))),
+            Variable.withDateTime(now),
+          ],
+        )
+        .get();
+    if (!mounted) return;
+    for (final row in counts) {
+      usage[row.read<int>('category_id')] = row.read<int>('uses');
+    }
     source = accounts.firstOrNull?.id;
     destination = accounts.where((a) => a.id != source).firstOrNull?.id;
     category = choices.firstOrNull?.id;
@@ -96,6 +124,7 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
     for (final c in [amount, received, rate, note]) {
       c.dispose();
     }
+    rateFocus.dispose();
     super.dispose();
   }
 
@@ -286,146 +315,476 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
       firstDate: DateTime(1),
       lastDate: DateTime(9999),
     );
-    if (picked != null && mounted) {
+    if (picked == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(date),
+    );
+    if (time != null && mounted) {
       setState(
         () => date = DateTime(
           picked.year,
           picked.month,
           picked.day,
-          date.hour,
-          date.minute,
-          date.second,
+          time.hour,
+          time.minute,
         ),
       );
     }
   }
 
-  InputDecoration decoration(String label, {String? suffix}) => InputDecoration(
-    labelText: label,
-    suffixText: suffix,
-    errorText: errors[label],
-    border: const OutlineInputBorder(),
-    focusedBorder: OutlineInputBorder(
-      borderSide: BorderSide(color: colors.ink),
+  String get when {
+    final today = DateUtils.dateOnly(DateTime.now());
+    final day = DateUtils.dateOnly(date);
+    final label = day == today
+        ? 'Today'
+        : day == DateTime(today.year, today.month, today.day - 1)
+        ? 'Yesterday'
+        : DateFormat('EEE d MMM').format(date);
+    return '$label, ${DateFormat('HH:mm').format(date)}';
+  }
+
+  TextStyle get muted =>
+      Theme.of(context).textTheme.bodyMedium!.copyWith(color: colors.muted);
+  TextStyle get valueStyle =>
+      Theme.of(context).textTheme.titleSmall!.copyWith(color: colors.ink);
+  Widget error(String key) => errors[key] == null
+      ? const SizedBox.shrink()
+      : Text(errors[key]!, style: muted.copyWith(color: colors.warning));
+  Widget icon(IconData data, Color color, [double size = 22]) => PhosphorIcon(
+    data,
+    color: color,
+    size: size,
+    duotoneSecondaryColor: color,
+    duotoneSecondaryOpacity: .25,
+  );
+  InputDecoration plain(String hint) =>
+      InputDecoration.collapsed(hintText: hint, hintStyle: muted);
+
+  Future<int?> choose(
+    String title,
+    Map<int, String> items,
+    int? selected,
+  ) async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    return showModalBottomSheet<int>(
+      context: context,
+      backgroundColor: colors.surface,
+      useSafeArea: true,
+      builder: (sheet) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(title, style: valueStyle),
+            ),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  for (final e in items.entries)
+                    ListTile(
+                      title: Text(e.value, style: valueStyle),
+                      trailing: selected == e.key
+                          ? icon(PhosphorIconsDuotone.check, colors.ink)
+                          : null,
+                      onTap: () => Navigator.pop(sheet, e.key),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget row(String label, Widget value, {VoidCallback? tap}) => InkWell(
+    onTap: tap,
+    child: Container(
+      constraints: const BoxConstraints(minHeight: 46),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: colors.rule, width: .7)),
+      ),
+      child: Row(
+        children: [
+          Text(label, style: muted),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Align(alignment: Alignment.centerRight, child: value),
+          ),
+          if (tap != null)
+            icon(PhosphorIconsDuotone.caretRight, colors.muted, 16),
+        ],
+      ),
     ),
   );
-  Widget number(
-    String label,
-    TextEditingController controller,
-    String? suffix,
-  ) => TextField(
-    key: Key(label),
-    controller: controller,
-    decoration: decoration(label, suffix: suffix),
-    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-    onChanged: (_) => change(() {
-      if (label != 'Amount') rateEdited = label == 'Rate';
-      syncConversion();
-    }),
+  Widget accountRow(bool to) {
+    final label = to || kind == 'income' ? 'To' : 'From';
+    final current = account(to ? destination : source);
+    return row(
+      label,
+      Text.rich(
+        TextSpan(
+          text: current?.name ?? 'Choose account',
+          children: [
+            TextSpan(text: ' ${current?.currency ?? ''}', style: muted),
+          ],
+        ),
+        style: valueStyle,
+      ),
+      tap: () async {
+        final id = await choose(label, {
+          for (final a in accounts) a.id: '${a.name}, ${a.currency}',
+        }, current?.id);
+        if (id != null && mounted) {
+          change(() {
+            if (to) {
+              destination = id;
+            } else {
+              source = id;
+            }
+            resetConversion();
+          });
+        }
+      },
+    );
+  }
+
+  Widget segments() => Container(
+    padding: const EdgeInsets.all(3),
+    decoration: BoxDecoration(
+      color: Color.alphaBlend(colors.rule.withValues(alpha: .4), colors.ground),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
+      children: [
+        for (final label in ['Expense', 'Income', 'Transfer'])
+          Expanded(
+            child: TextButton(
+              style: TextButton.styleFrom(
+                backgroundColor: kind == label.toLowerCase()
+                    ? colors.brass
+                    : null,
+                foregroundColor: kind == label.toLowerCase()
+                    ? colors.onBrass
+                    : colors.muted,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              onPressed: () => change(() {
+                if (kind != label.toLowerCase()) {
+                  kind = label.toLowerCase();
+                  category = choices.firstOrNull?.id;
+                  resetConversion();
+                }
+              }),
+              child: Text(label),
+            ),
+          ),
+      ],
+    ),
   );
-  Widget picker(
-    String label,
-    int? value,
-    Map<int, String> items,
-    ValueChanged<int?> select,
-  ) => DropdownButtonFormField<int>(
-    key: ValueKey((label, value)),
-    initialValue: value,
-    isExpanded: true,
-    decoration: decoration(label),
-    items: [
-      for (final e in items.entries)
-        DropdownMenuItem(value: e.key, child: Text(e.value)),
-    ],
-    onChanged: (v) => change(() => select(v)),
-  );
+  Widget hero() {
+    final style = amountNumberStyle(colors.ink, 60);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Center(
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  currencyOf(account(source)?.currency ?? 'CNY').symbol,
+                  style: style.copyWith(fontSize: 26),
+                ),
+              ),
+              IntrinsicWidth(
+                child: TextField(
+                  key: const Key('Amount'),
+                  controller: amount,
+                  autofocus: true,
+                  style: style,
+                  decoration: InputDecoration.collapsed(
+                    hintText: '0',
+                    hintStyle: style.copyWith(color: colors.muted),
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  onChanged: (_) => change(syncConversion),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget grid() {
+    final sorted = choices.toList()
+      ..sort((a, b) {
+        final cmp = (usage[b.id] ?? 0).compareTo(usage[a.id] ?? 0);
+        return cmp == 0 ? a.id.compareTo(b.id) : cmp;
+      });
+    final visible = sorted.take(7).toList();
+    final selected = choices.where((c) => c.id == category).firstOrNull;
+    if (selected != null && !visible.contains(selected)) visible[6] = selected;
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 4,
+      mainAxisSpacing: 6,
+      crossAxisSpacing: 6,
+      mainAxisExtent: 62,
+      children: [
+        for (final c in visible)
+          tile(
+            c.name,
+            categoryIcons[c.iconKey] ?? PhosphorIconsDuotone.tag,
+            c.id == category,
+            () => change(() => category = c.id),
+          ),
+        for (int i = visible.length; i < 7; i++) const SizedBox.shrink(),
+        tile('More', PhosphorIconsDuotone.dotsThree, false, () async {
+          final id = await choose('Categories', {
+            for (final c in choices) c.id: c.name,
+          }, category);
+          if (id != null && mounted) change(() => category = id);
+        }),
+      ],
+    );
+  }
+
+  Widget tile(String label, IconData glyph, bool active, VoidCallback tap) {
+    final ink = active ? colors.onBrass : colors.ink;
+    return Material(
+      color: active ? colors.brass : colors.surface,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: active ? colors.brass : colors.rule, width: .7),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: tap,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            icon(glyph, ink),
+            const SizedBox(height: 3),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 3),
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelSmall!
+                    .copyWith(color: ink),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String get displayRate {
+    final d = Decimal.tryParse(rate.text);
+    return d == null ? rate.text : d.round(scale: 6).toString();
+  }
+
+  String? preview(Decimal? fx, String from, String to) {
+    if (fx == null) return null;
+    try {
+      return formatMoney(convert(Money.parse(amount.text, from), fx, to));
+    } on FormatException {
+      return null;
+    } on RangeError {
+      return null;
+    }
+  }
+
+  Widget card() {
+    final from = account(source)!.currency, to = account(destination)!;
+    final key = (from, to.currency, DateUtils.dateOnly(date));
+    if (quoteKey != key) {
+      quoteKey = key;
+      quote = ref.read(fxServiceProvider).rate(from, to.currency, on: date);
+    }
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        border: Border.all(color: colors.rule, width: .7),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('${to.name} receives', style: muted),
+          Row(
+            children: [
+              Text(
+                currencyOf(to.currency).symbol,
+                style: amountNumberStyle(colors.ink, 28),
+              ),
+              Expanded(
+                child: TextField(
+                  key: const Key('Received'),
+                  controller: received,
+                  style: amountNumberStyle(colors.ink, 28),
+                  decoration: plain('0'),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  onChanged: (_) => change(() {
+                    rateEdited = false;
+                    syncConversion();
+                  }),
+                ),
+              ),
+              Text('at ', style: muted),
+              Flexible(
+                child: editingRate
+                    ? TextField(
+                        key: const Key('Rate'),
+                        focusNode: rateFocus,
+                        autofocus: true,
+                        controller: rate,
+                        textAlign: TextAlign.end,
+                        style: amountNumberStyle(colors.ink, 18),
+                        decoration: plain('Rate'),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        onChanged: (_) => change(() {
+                          rateEdited = true;
+                          syncConversion();
+                        }),
+                      )
+                    : InkWell(
+                        onTap: () => setState(() => editingRate = true),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Text(
+                            displayRate.isEmpty ? 'Rate' : displayRate,
+                            style: amountNumberStyle(colors.ink, 18),
+                          ),
+                        ),
+                      ),
+              ),
+            ],
+          ),
+          FutureBuilder<Decimal?>(
+            key: ValueKey(key),
+            future: quote,
+            builder: (_, snapshot) {
+              final result = preview(snapshot.data, from, to.currency);
+              return result == null
+                  ? const SizedBox.shrink()
+                  : Text("Today's rate would give $result", style: muted);
+            },
+          ),
+          error('Received'),
+          error('Rate'),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: Text(
-        widget.editTransactionId == null ? 'Add entry' : 'Edit entry',
+      centerTitle: true,
+      leading: IconButton(
+        tooltip: 'Close',
+        onPressed: busy ? null : finish,
+        icon: icon(PhosphorIconsDuotone.x, colors.ink),
       ),
+      title: Text(
+        widget.editTransactionId == null ? 'New entry' : 'Edit entry',
+        style: muted,
+      ),
+      actions: [
+        if (widget.editTransactionId != null)
+          TextButton(
+            onPressed: busy ? null : remove,
+            child: const Text('Delete'),
+          ),
+      ],
     ),
     body: FutureBuilder<void>(
       future: loading,
-      builder: (context, snapshot) {
+      builder: (_, snapshot) {
         if (snapshot.hasError) {
           return const Center(child: Text('Could not load the entry.'));
         }
         if (snapshot.connectionState != ConnectionState.done) {
           return const SizedBox.shrink();
         }
-        final names = {
-          for (final a in accounts) a.id: '${a.name}, ${a.currency}',
-        };
-        final fields = <Widget>[
-          SegmentedButton<String>(
-            segments: [
-              for (final k in ['Expense', 'Income', 'Transfer'])
-                ButtonSegment(value: k.toLowerCase(), label: Text(k)),
-            ],
-            selected: {kind},
-            showSelectedIcon: false,
-            onSelectionChanged: (s) => change(() {
-              kind = s.single;
-              category = choices.firstOrNull?.id;
-              resetConversion();
-            }),
-          ),
-          number('Amount', amount, account(source)?.currency),
-          picker('Account', source, names, (id) {
-            source = id;
-            resetConversion();
-          }),
-          if (transfer)
-            picker('To account', destination, names, (id) {
-              destination = id;
-              resetConversion();
-            })
-          else
-            picker('Category', category, {
-              for (final c in choices) c.id: c.name,
-            }, (id) => category = id),
-          if (cross) ...[
-            number('Received', received, account(destination)!.currency),
-            number('Rate', rate, null),
-          ],
-          OutlinedButton(
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(color: colors.muted),
-            ),
-            onPressed: pickDate,
-            child: Text(
-              'Date   ${MaterialLocalizations.of(context).formatMediumDate(date)}',
-            ),
-          ),
-          TextField(controller: note, decoration: decoration('Note')),
-          if (errors['Save'] != null) Text(errors['Save']!),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: colors.brass,
-              foregroundColor: colors.onBrass,
-            ),
-            onPressed: busy ? null : save,
-            child: const Text('Save'),
-          ),
-          if (widget.editTransactionId != null)
-            TextButton(
-              onPressed: busy ? null : remove,
-              child: const Text('Delete'),
-            ),
-        ];
         return SafeArea(
-          child: AbsorbPointer(
-            absorbing: busy,
-            child: ListView(
-              padding: const EdgeInsets.all(16),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 0, 18, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                for (final field in fields)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: field,
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        segments(),
+                        hero(),
+                        error('Amount'),
+                        accountRow(false),
+                        error('Account'),
+                        if (transfer) ...[
+                          accountRow(true),
+                          error('To account'),
+                        ],
+                        row(
+                          'When',
+                          Text(when, style: valueStyle),
+                          tap: pickDate,
+                        ),
+                        row(
+                          'Note',
+                          TextField(
+                            controller: note,
+                            textAlign: TextAlign.end,
+                            decoration: plain('Add a note'),
+                            style: valueStyle,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        if (!transfer) ...[grid(), error('Category')],
+                        if (cross) card(),
+                        error('Save'),
+                      ],
+                    ),
                   ),
+                ),
+                const SizedBox(height: 8),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colors.brass,
+                    foregroundColor: colors.onBrass,
+                    minimumSize: const Size.fromHeight(46),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(22),
+                    ),
+                  ),
+                  onPressed: busy ? null : save,
+                  child: const Text('Save'),
+                ),
               ],
             ),
           ),
@@ -434,3 +793,22 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
     ),
   );
 }
+
+const categoryIcons = {
+  'forkKnife': PhosphorIconsDuotone.forkKnife,
+  'shoppingCart': PhosphorIconsDuotone.shoppingCart,
+  'bus': PhosphorIconsDuotone.bus,
+  'house': PhosphorIconsDuotone.house,
+  'receipt': PhosphorIconsDuotone.receipt,
+  'shoppingBag': PhosphorIconsDuotone.shoppingBag,
+  'bookOpen': PhosphorIconsDuotone.bookOpen,
+  'firstAidKit': PhosphorIconsDuotone.firstAidKit,
+  'filmStrip': PhosphorIconsDuotone.filmStrip,
+  'gift': PhosphorIconsDuotone.gift,
+  'paperPlaneTilt': PhosphorIconsDuotone.paperPlaneTilt,
+  'dotsThree': PhosphorIconsDuotone.dotsThree,
+  'graduationCap': PhosphorIconsDuotone.graduationCap,
+  'users': PhosphorIconsDuotone.users,
+  'briefcase': PhosphorIconsDuotone.briefcase,
+  'arrowUUpLeft': PhosphorIconsDuotone.arrowUUpLeft,
+};

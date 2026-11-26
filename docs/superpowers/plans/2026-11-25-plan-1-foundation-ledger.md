@@ -268,6 +268,12 @@ test('convert rounds half up, no truncation', () {
 - [x] **Step 2:** Run → FAIL. **Step 3:** Implement. **Step 4:** Run → PASS.
 - [x] **Step 5: Commit** `feat: manual entry form for expense, income and transfer`
 
+### Task 8b: Redesigned entry form
+
+- [x] Update the six entry-form tests and add coverage for category ranking, More, and the transfer card.
+- [x] Redesign the form with an amount hero, account sheets, date and time pickers, category grid, editable transfer quote, and pinned Save button.
+- [x] Run the full test suite and analyzer. Commit `feat: redesigned entry form`.
+
 ### Task 9: Wealth screen
 
 **Files:**

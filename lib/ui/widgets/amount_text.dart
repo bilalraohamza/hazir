@@ -33,17 +33,7 @@ class AmountText extends StatelessWidget {
     final digits = formatted.substring(symbolStart + symbol.length).split('.');
     final decimals = showDecimals && digits.length > 1 ? '.${digits[1]}' : '';
 
-    final style = TextStyle(
-      color: colors.ink,
-      fontFamily: 'Bricolage',
-      fontSize: size,
-      fontWeight: FontWeight.w500,
-      fontVariations: const [
-        FontVariation('wdth', 80),
-        FontVariation('wght', 500),
-      ],
-      fontFeatures: const [FontFeature.tabularFigures()],
-    );
+    final style = amountNumberStyle(colors.ink, size);
     final small = style.copyWith(fontSize: size / 2);
 
     return Semantics(
@@ -71,3 +61,12 @@ class AmountText extends StatelessWidget {
     );
   }
 }
+
+TextStyle amountNumberStyle(Color ink, double size) => TextStyle(
+  color: ink,
+  fontFamily: 'Bricolage',
+  fontSize: size,
+  fontWeight: FontWeight.w500,
+  fontVariations: const [FontVariation('wdth', 80), FontVariation('wght', 500)],
+  fontFeatures: const [FontFeature.tabularFigures()],
+);
