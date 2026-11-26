@@ -584,11 +584,9 @@ packages:
   phosphor_flutter:
     dependency: "direct main"
     description:
-      path: "."
-      ref: "6c707254398c362f76cb32e7986470a4033d512a"
-      resolved-ref: "6c707254398c362f76cb32e7986470a4033d512a"
-      url: "https://github.com/GamesByJerry/phosphor-icons-flutter.git"
-    source: git
+      path: "packages/phosphor_flutter"
+      relative: true
+    source: path
     version: "2.1.0"
   platform:
     dependency: transitive

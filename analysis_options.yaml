@@ -14,6 +14,8 @@ analyzer:
     - build/**
     - android/**
     - ios/**
+    # Preserve the upstream renderer's Flutter material import verbatim.
+    - packages/phosphor_flutter/lib/src/phosphor_icon.dart
 
 linter:
   # The lint rules applied to this project can be customized in the
