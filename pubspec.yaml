@@ -43,7 +43,11 @@ dependencies:
   dio: ^5.11.1
   decimal: ^3.2.7
   intl: ^0.20.3
-  phosphor_flutter: ^2.1.0
+  # Compatibility fix for Flutter's IconData (phosphor-icons/flutter#68).
+  phosphor_flutter:
+    git:
+      url: https://github.com/GamesByJerry/phosphor-icons-flutter.git
+      ref: 6c707254398c362f76cb32e7986470a4033d512a
   path_provider: ^2.1.6
 
 dev_dependencies:

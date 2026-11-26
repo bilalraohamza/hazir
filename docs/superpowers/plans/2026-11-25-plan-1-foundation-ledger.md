@@ -251,9 +251,9 @@ test('convert rounds half up, no truncation', () {
   - Chat, Goals and Upcoming show `PlaceholderTab(title)` with one line "Coming in the next update" and a "+" button to `/entry` on Chat.
   - Initial route in plan 1 is `/wealth`, because Chat is still a placeholder. Plan 2 changes the initial route to `/chat`. Tab order stays Chat, Wealth, Spending, Goals, Upcoming.
   - On start: `seedIfEmpty()` then `fxService.refreshIfNeeded()` (not awaited before first frame).
-- [ ] **Step 1: Write failing widget test:** with an in-memory db override, the app opens on Wealth, tapping "Spending" shows the Spending screen (its placeholder for now, found by type `SpendingScreen`), and both light and dark themes build without exceptions.
-- [ ] **Step 2:** Run → FAIL. **Step 3:** Implement. **Step 4:** Run → PASS.
-- [ ] **Step 5: Commit** `feat: app shell with five tabs and theming`
+- [x] **Step 1: Write failing widget test:** with an in-memory db override, the app opens on Wealth, tapping "Spending" shows the Spending screen (its placeholder for now, found by type `SpendingScreen`), and both light and dark themes build without exceptions.
+- [x] **Step 2:** Run → FAIL. **Step 3:** Implement. **Step 4:** Run → PASS.
+- [x] **Step 5: Commit** `feat: app shell with five tabs and theming`
 
 ### Task 8: Manual entry form
 
