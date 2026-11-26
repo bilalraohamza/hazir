@@ -31,7 +31,7 @@ class EntryFormScreen extends ConsumerStatefulWidget {
 }
 
 class _EntryFormState extends ConsumerState<EntryFormScreen> {
-  final amount = TextEditingController(),
+  final amount = _AmountController(),
       received = TextEditingController(),
       rate = TextEditingController(),
       note = TextEditingController();
@@ -299,18 +299,7 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
   Future<void> pickDate() async {
     final picked = await showDatePicker(
       context: context,
-      builder: (context, child) {
-        final theme = Theme.of(context);
-        return Theme(
-          data: theme.copyWith(
-            colorScheme: theme.colorScheme.copyWith(
-              primary: colors.ink,
-              onPrimary: colors.ground,
-            ),
-          ),
-          child: child!,
-        );
-      },
+      builder: pickerTheme,
       initialDate: date,
       firstDate: DateTime(1),
       lastDate: DateTime(9999),
@@ -319,6 +308,7 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
     final time = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(date),
+      builder: pickerTheme,
     );
     if (time != null && mounted) {
       setState(
@@ -331,6 +321,27 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
         ),
       );
     }
+  }
+
+  Widget pickerTheme(BuildContext context, Widget? child) {
+    final theme = Theme.of(context);
+    return Theme(
+      data: theme.copyWith(
+        colorScheme: theme.colorScheme.copyWith(
+          primary: colors.ink,
+          onPrimary: colors.ground,
+        ),
+        inputDecorationTheme: theme.inputDecorationTheme.copyWith(
+          border: InputBorder.none,
+        ),
+        timePickerTheme: const TimePickerThemeData(
+          inputDecorationTheme: InputDecorationThemeData(
+            border: InputBorder.none,
+          ),
+        ),
+      ),
+      child: child!,
+    );
   }
 
   String get when {
@@ -370,6 +381,7 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
     return showModalBottomSheet<int>(
       context: context,
       backgroundColor: colors.surface,
+      barrierColor: colors.onBrass.withValues(alpha: .5),
       useSafeArea: true,
       builder: (sheet) => SafeArea(
         child: Column(
@@ -489,6 +501,7 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
   );
   Widget hero() {
     final style = amountNumberStyle(colors.ink, 60);
+    final currency = currencyOf(account(source)?.currency ?? 'CNY');
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 20),
       child: Center(
@@ -501,7 +514,7 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
-                  currencyOf(account(source)?.currency ?? 'CNY').symbol,
+                  currency.symbol,
                   style: style.copyWith(fontSize: 26),
                 ),
               ),
@@ -688,9 +701,14 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
             future: quote,
             builder: (_, snapshot) {
               final result = preview(snapshot.data, from, to.currency);
-              return result == null
-                  ? const SizedBox.shrink()
-                  : Text("Today's rate would give $result", style: muted);
+              const hint = 'Tap either number to change it.';
+              return Text(
+                result == null
+                    ? hint
+                    : "$hint Today's rate would give $result.",
+                style: Theme.of(context).textTheme.bodySmall!
+                    .copyWith(color: colors.muted),
+              );
             },
           ),
           error('Received'),
@@ -737,38 +755,46 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        segments(),
-                        hero(),
-                        error('Amount'),
-                        accountRow(false),
-                        error('Account'),
-                        if (transfer) ...[
-                          accountRow(true),
-                          error('To account'),
-                        ],
-                        row(
-                          'When',
-                          Text(when, style: valueStyle),
-                          tap: pickDate,
-                        ),
-                        row(
-                          'Note',
-                          TextField(
-                            controller: note,
-                            textAlign: TextAlign.end,
-                            decoration: plain('Add a note'),
-                            style: valueStyle,
+                  child: AbsorbPointer(
+                    absorbing: busy,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          segments(),
+                          hero(),
+                          error('Amount'),
+                          accountRow(false),
+                          error('Account'),
+                          if (transfer) ...[
+                            accountRow(true),
+                            error('To account'),
+                          ],
+                          if (!transfer) ...[
+                            const SizedBox(height: 12),
+                            grid(),
+                            error('Category'),
+                          ],
+                          if (cross) ...[const SizedBox(height: 12), card()],
+                          const SizedBox(height: 6),
+                          row(
+                            'When',
+                            Text(when, style: valueStyle),
+                            tap: pickDate,
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        if (!transfer) ...[grid(), error('Category')],
-                        if (cross) card(),
-                        error('Save'),
-                      ],
+                          row(
+                            'Note',
+                            TextField(
+                              controller: note,
+                              textAlign: TextAlign.end,
+                              decoration: plain('Add a note'),
+                              style: valueStyle,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          error('Save'),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -792,6 +818,39 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
       },
     ),
   );
+}
+
+class _AmountController extends TextEditingController {
+  @override
+  TextSpan buildTextSpan({
+    required BuildContext context,
+    TextStyle? style,
+    required bool withComposing,
+  }) {
+    final decimalPoint = text.indexOf('.');
+    if (style == null ||
+        decimalPoint < 0 ||
+        (withComposing &&
+            value.isComposingRangeValid &&
+            !value.composing.isCollapsed)) {
+      return super.buildTextSpan(
+        context: context,
+        style: style,
+        withComposing: withComposing,
+      );
+    }
+    final muted = Theme.of(context).extension<AppColors>()!.muted;
+    return TextSpan(
+      style: style,
+      text: text.substring(0, decimalPoint),
+      children: [
+        TextSpan(
+          text: text.substring(decimalPoint),
+          style: style.copyWith(fontSize: style.fontSize! / 2, color: muted),
+        ),
+      ],
+    );
+  }
 }
 
 const categoryIcons = {

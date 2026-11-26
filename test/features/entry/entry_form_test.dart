@@ -153,7 +153,15 @@ void main() {
     t,
   ) async {
     await open(t, editing: true);
-    expect(find.text('1.50'), findsOneWidget);
+    final field = t.widget<TextField>(find.byKey(const Key('Amount')));
+    final span = field.controller!.buildTextSpan(
+      context: t.element(find.byKey(const Key('Amount'))),
+      style: field.style,
+      withComposing: false,
+    );
+    expect(span.toPlainText(), '1.50');
+    expect((span.children!.last as TextSpan).text, '.50');
+    expect(span.children!.last.style!.fontSize, 30);
     await t.enterText(find.byKey(const Key('Amount')), '3');
     await tap(t, 'Save');
     expect((await rows(t)).single.amountMinor, 300);
@@ -214,6 +222,23 @@ void main() {
       expect(find.text('Alipay receives'), findsOneWidget);
       expect(find.text('0.666667'), findsOneWidget);
       expect(find.textContaining("Today's rate would give"), findsNothing);
+      expect(find.text('Tap either number to change it.'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'rounded rate display preserves exact received minor units on save',
+    (t) async {
+      await open(t);
+      await tap(t, 'Transfer');
+      await tap(t, 'From');
+      await tap(t, 'Pakistani bank, PKR');
+      await t.enterText(find.byKey(const Key('Amount')), '500000');
+      await t.enterText(find.byKey(const Key('Received')), '122.01');
+      await t.pumpAndSettle();
+      expect(find.text('0.000244'), findsOneWidget);
+      await tap(t, 'Save');
+      expect((await rows(t)).single.toAmountMinor, 12201);
     },
   );
 }
