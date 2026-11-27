@@ -6,6 +6,8 @@ import '../../app/providers.dart';
 import '../../data/db/app_database.dart';
 import '../../ui/theme/app_colors.dart';
 import '../../ui/widgets/category_icons.dart';
+import '../../ui/widgets/deletion_feedback.dart';
+import '../ledger/deletion_service.dart';
 import '../ledger/ledger_errors.dart';
 
 class CategoryEditSheet extends ConsumerStatefulWidget {
@@ -92,6 +94,146 @@ class CategoryEditSheetState extends ConsumerState<CategoryEditSheet> {
       await ref.read(categoryServiceProvider).archiveCategory(id);
       return id;
     });
+  }
+
+  Future<void> deleteCategory() async {
+    if (busy) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      busy = true;
+      error = null;
+    });
+    try {
+      final deletion = ref.read(deletionServiceProvider);
+      final details = await deletion.categoryDeletionDetails(
+        widget.category!.id,
+      );
+      if (!mounted) return;
+      final Category? destination;
+      if (details.entryCount == 0) {
+        if (!await confirmEmptyCategory(details.category.name) || !mounted) {
+          return;
+        }
+        destination = null;
+      } else {
+        destination = await chooseDestination(details);
+        if (destination == null || !mounted) return;
+      }
+      final undo = deletionUndoFor(context);
+      final receipt = await deletion.deleteCategory(
+        details.category.id,
+        moveToCategoryId: destination?.id,
+      );
+      final name = details.category.name;
+      final movement = destination == null
+          ? ''
+          : ', ${entryCountLabel(details.entryCount)} moved to ${destination.name}';
+      undo('$name deleted$movement', receipt);
+      if (mounted) Navigator.pop(context);
+    } on LedgerException catch (failure) {
+      if (mounted) setState(() => error = failure.message);
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  Future<bool> confirmEmptyCategory(String name) async {
+    return await showDialog<bool>(
+          context: context,
+          barrierColor: colors.onBrass.withValues(alpha: .5),
+          builder: (dialog) => AlertDialog(
+            backgroundColor: colors.surface,
+            surfaceTintColor: colors.surface,
+            shadowColor: colors.onBrass,
+            title: Text('Delete $name?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialog, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                style: deleteButtonStyle(),
+                onPressed: () => Navigator.pop(dialog, true),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  Future<Category?> chooseDestination(CategoryDeletionDetails details) {
+    Category? destination;
+    final count = details.entryCount;
+    final subject = count == 1
+        ? 'uses this category. Choose where it goes'
+        : 'use this category. Choose where they go';
+    final muted = text.bodyMedium!.copyWith(color: colors.muted);
+    return showDialog<Category>(
+      context: context,
+      barrierColor: colors.onBrass.withValues(alpha: .5),
+      builder: (dialog) => StatefulBuilder(
+        builder: (context, select) => AlertDialog(
+          scrollable: true,
+          backgroundColor: colors.surface,
+          surfaceTintColor: colors.surface,
+          shadowColor: colors.onBrass,
+          title: Text('Delete ${details.category.name}?'),
+          content: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${entryCountLabel(count)} $subject, so your spending history stays correct.',
+              ),
+              const SizedBox(height: 12),
+              Text('Move entries to', style: muted),
+              DropdownButton<Category>(
+                key: const ValueKey('move-category-picker'),
+                dropdownColor: colors.surface,
+                underline: Divider(height: .7, color: colors.rule),
+                isExpanded: true,
+                icon: PhosphorIcon(
+                  PhosphorIconsRegular.caretDown,
+                  size: 14,
+                  color: colors.muted,
+                ),
+                value: destination,
+                hint: const Text('Choose a category'),
+                items: [
+                  for (final category in details.destinations)
+                    DropdownMenuItem(
+                      value: category,
+                      child: Text(category.name),
+                    ),
+                ],
+                onChanged: details.destinations.isEmpty
+                    ? null
+                    : (choice) => select(() => destination = choice),
+              ),
+              if (details.destinations.isEmpty)
+                Text(
+                  'Add another category of this type or archive this one.',
+                  style: muted,
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialog),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: deleteButtonStyle(),
+              onPressed: destination == null
+                  ? null
+                  : () => Navigator.pop(dialog, destination),
+              child: Text('Move ${entryCountLabel(count)} and delete'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> submit(Future<int> Function() action) async {
@@ -223,11 +365,17 @@ class CategoryEditSheetState extends ConsumerState<CategoryEditSheet> {
                       ),
                   ],
                 ),
-              ] else
+              ] else ...[
                 TextButton(
                   onPressed: busy ? null : archive,
                   child: const Text('Archive'),
                 ),
+                TextButton(
+                  style: TextButton.styleFrom(foregroundColor: colors.warning),
+                  onPressed: busy ? null : deleteCategory,
+                  child: const Text('Delete category'),
+                ),
+              ],
               const SizedBox(height: 16),
               FilledButton(
                 style: FilledButton.styleFrom(

@@ -5,6 +5,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../ui/widgets/amount_text.dart';
 import '../../ui/widgets/category_icons.dart';
 import '../../ui/widgets/money_input.dart';
+import '../../ui/widgets/deletion_feedback.dart';
 
 import 'package:decimal/decimal.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -52,6 +53,7 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
   int? source, destination, category;
   late DateTime date = widget.initialDate ?? DateTime.now();
   bool busy = false, rateEdited = false;
+  String? originalNote;
   final errors = <String, String>{};
   AppColors get colors => Theme.of(context).extension<AppColors>()!;
   bool get transfer => kind == 'transfer';
@@ -113,6 +115,7 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
       Money(row.amountMinor, row.currency),
       withSymbol: false,
     );
+    originalNote = row.note;
     note.text = row.note ?? '';
     date = row.occurredAt;
     if (cross) {
@@ -269,33 +272,18 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
   }
 
   Future<void> remove() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      barrierColor: colors.onBrass.withValues(alpha: .5),
-      builder: (dialog) => AlertDialog(
-        backgroundColor: colors.surface,
-        surfaceTintColor: colors.surface,
-        shadowColor: colors.onBrass,
-        title: const Text('Delete this entry?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialog, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialog, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-    if (ok != true || !mounted || busy) return;
+    final confirmed = await confirmEntryDeletion(context);
+    if (!confirmed || !mounted || busy) return;
+    final undo = deletionUndoFor(context);
     setState(() => busy = true);
     try {
-      await ref
-          .read(ledgerServiceProvider)
+      final receipt = await ref
+          .read(deletionServiceProvider)
           .deleteTransaction(widget.editTransactionId!);
+      undo(deletedEntryMessage(originalNote), receipt);
       if (mounted) finish();
+    } on LedgerException catch (error) {
+      if (mounted) setState(() => errors['Save'] = error.message);
     } finally {
       if (mounted) setState(() => busy = false);
     }

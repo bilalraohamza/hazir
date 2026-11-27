@@ -206,4 +206,43 @@ void main() {
       );
     },
   );
+
+  testWidgets(
+    'category deletion requires a destination and Undo returns moved entries',
+    (tester) async {
+      await tester.runAsync(
+        () => ledger.addExpense(
+          accountId: 1,
+          categoryId: 1,
+          amount: const Money(2800, 'CNY'),
+        ),
+      );
+      await open(tester);
+      await tap(tester, find.byTooltip('Settings'));
+      await tap(tester, key('category-1'));
+      await tap(tester, find.text('Delete category'));
+      expect(
+        find.text(
+          '1 entry uses this category. Choose where it goes, so your spending history stays correct.',
+        ),
+        findsOneWidget,
+      );
+      final move = find.widgetWithText(FilledButton, 'Move 1 entry and delete');
+      expect(tester.widget<FilledButton>(move).onPressed, isNull);
+      await tap(tester, key('move-category-picker'));
+      await tap(tester, find.text('Groceries').last);
+      await tap(tester, move);
+      expect(
+        find.text('Food deleted, 1 entry moved to Groceries'),
+        findsOneWidget,
+      );
+      expect(key('category-1'), findsNothing);
+      await tap(tester, find.text('Undo'));
+      expect(key('category-1'), findsOneWidget);
+      await tap(tester, find.byTooltip('Back'));
+      await tap(tester, find.text('Spending'));
+      expect(find.text('Food'), findsOneWidget);
+      expect(find.text('Groceries'), findsNothing);
+    },
+  );
 }

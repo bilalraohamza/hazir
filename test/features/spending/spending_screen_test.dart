@@ -226,4 +226,51 @@ void main() {
     final form = tester.widget<EntryFormScreen>(find.byType(EntryFormScreen));
     expect(form.initialDate, december);
   });
+
+  testWidgets(
+    'swiping an entry requires confirmation and Undo restores the row',
+    (tester) async {
+      await tester.runAsync(() => expense(2800, note: 'Lunch'));
+      await show(tester);
+      await tap(tester, find.text('Food'));
+      final row = find.text('Lunch');
+      await tester.drag(row, const Offset(-650, 0));
+      await tester.pumpAndSettle();
+      expect(find.text('Delete this entry?'), findsOneWidget);
+      await tap(tester, find.text('Cancel'));
+      expect(row, findsOneWidget);
+      await tester.drag(row, const Offset(-650, 0));
+      await tester.pumpAndSettle();
+      await tap(tester, find.text('Delete'));
+      expect(row, findsNothing);
+      expect(find.text('Lunch deleted'), findsOneWidget);
+      await tap(tester, find.text('Undo'));
+      expect(row, findsOneWidget);
+      await tap(tester, find.byTooltip('Back'));
+      expect(total(tester), const Money(2800, 'CNY'));
+    },
+  );
+
+  testWidgets(
+    'a second delete replaces the first Undo bar and expires after eight seconds',
+    (tester) async {
+      await tester.runAsync(() async {
+        await expense(2800, note: 'Lunch');
+        await expense(3000, note: 'Dinner');
+      });
+      await show(tester);
+      await tap(tester, find.text('Food'));
+      for (final note in ['Lunch', 'Dinner']) {
+        await tester.drag(find.text(note), const Offset(-650, 0));
+        await tester.pumpAndSettle();
+        await tap(tester, find.text('Delete'));
+        expect(find.text('$note deleted'), findsOneWidget);
+        expect(find.byType(SnackBar), findsOneWidget);
+      }
+      expect(find.text('Lunch deleted'), findsNothing);
+      await tester.pump(const Duration(seconds: 8));
+      await tester.pumpAndSettle();
+      expect(find.text('Undo'), findsNothing);
+    },
+  );
 }

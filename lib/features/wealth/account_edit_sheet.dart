@@ -8,7 +8,11 @@ import '../../data/db/app_database.dart';
 import '../../ui/theme/app_colors.dart';
 import '../../ui/widgets/amount_text.dart';
 import '../../ui/widgets/money_input.dart';
+import '../../ui/widgets/deletion_feedback.dart';
+import '../ledger/deletion_service.dart';
 import '../ledger/ledger_errors.dart';
+
+enum _DeleteAccountAction { delete, archive }
 
 class AccountEditSheet extends ConsumerStatefulWidget {
   const AccountEditSheet({super.key, this.account});
@@ -135,6 +139,119 @@ class _AccountEditSheetState extends ConsumerState<AccountEditSheet> {
     } finally {
       if (mounted) setState(() => busy = false);
     }
+  }
+
+  Future<void> deleteAccount() async {
+    if (busy) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      busy = true;
+      errors.remove('Account');
+    });
+    try {
+      final deletion = ref.read(deletionServiceProvider);
+      final details = await deletion.accountDeletionDetails(widget.account!.id);
+      if (!mounted) return;
+      final action = await confirmDeletion(details);
+      if (!mounted || action == null) return;
+      final id = details.account.id;
+      final undo = deletionUndoFor(context);
+      switch (action) {
+        case _DeleteAccountAction.archive:
+          await ref.read(accountServiceProvider).archiveAccount(id);
+        case _DeleteAccountAction.delete:
+          final receipt = await deletion.deleteAccount(id);
+          final name = details.account.name;
+          final count = details.entryCount;
+          undo(
+            count == 0
+                ? '$name deleted'
+                : '$name and ${entryCountLabel(count)} deleted',
+            receipt,
+          );
+      }
+      if (mounted) Navigator.pop(context);
+    } on LedgerException catch (error) {
+      if (mounted) setState(() => errors['Account'] = error.message);
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  Future<_DeleteAccountAction?> confirmDeletion(
+    AccountDeletionDetails details,
+  ) {
+    final name = details.account.name;
+    final entryCount = details.entryCount;
+    final transfers = details.transferCount;
+    final names = details.counterpartNames;
+    final counterparts = names.length < 2
+        ? names.join()
+        : '${names.take(names.length - 1).join(', ')} and ${names.last}';
+    final countLabel = entryCountLabel(entryCount);
+    final description = StringBuffer('This permanently deletes the account');
+    if (entryCount > 0) description.write(' and its $countLabel');
+    if (transfers > 0) {
+      description.write(
+        ', including $transfers ${transfers == 1 ? 'transfer' : 'transfers'}',
+      );
+      if (counterparts.isNotEmpty) description.write(' with $counterparts');
+    }
+    description.write('.');
+    if (transfers > 0) description.write(' Their balances will change.');
+    return showModalBottomSheet<_DeleteAccountAction>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: colors.surface,
+      barrierColor: colors.onBrass.withValues(alpha: .5),
+      builder: (sheet) => SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 22, 20, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Delete $name?',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 12),
+              Text(description.toString()),
+              const SizedBox(height: 8),
+              Text(
+                "This can't be undone after a few seconds. To keep the history, archive it instead.",
+                style: muted,
+              ),
+              const SizedBox(height: 18),
+              FilledButton(
+                style: deleteButtonStyle(),
+                onPressed: () =>
+                    Navigator.pop(sheet, _DeleteAccountAction.delete),
+                child: Text(
+                  entryCount == 0
+                      ? 'Delete account'
+                      : 'Delete account and $countLabel',
+                ),
+              ),
+              OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: colors.rule),
+                ),
+                onPressed: () =>
+                    Navigator.pop(sheet, _DeleteAccountAction.archive),
+                child: const Text('Archive instead'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(sheet),
+                child: const Text('Cancel'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget field(String label, Widget control) => Column(
@@ -274,6 +391,12 @@ class _AccountEditSheetState extends ConsumerState<AccountEditSheet> {
                 TextButton(
                   onPressed: busy ? null : archive,
                   child: const Text('Archive'),
+                ),
+              if (!adding)
+                TextButton(
+                  style: TextButton.styleFrom(foregroundColor: colors.warning),
+                  onPressed: busy ? null : deleteAccount,
+                  child: const Text('Delete account'),
                 ),
               const SizedBox(height: 14),
               FilledButton(

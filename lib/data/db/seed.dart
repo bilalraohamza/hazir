@@ -38,6 +38,11 @@ const _categories = {
 };
 
 Future<void> _seedIfEmpty(AppDatabase db) async {
+  final initialized = await (db.select(
+    db.settings,
+  )..where((row) => row.key.equals('mainCurrency'))).getSingleOrNull();
+  if (initialized != null) return;
+
   final existing = await (db.select(db.accounts)..limit(1)).getSingleOrNull();
   if (existing != null) return;
 

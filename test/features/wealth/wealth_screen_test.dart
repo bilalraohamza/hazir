@@ -275,4 +275,53 @@ void main() {
       expect(amount(const Money(-125, 'CNY')), findsWidgets);
     },
   );
+
+  testWidgets(
+    'account delete dialog counts entries and counterparties and Undo restores them',
+    (tester) async {
+      await open(tester);
+      final ledger = providers(tester).read(ledgerServiceProvider);
+      await waitFor(
+        tester,
+        ledger
+            .addExpense(
+              accountId: 1,
+              categoryId: 1,
+              amount: const Money(2800, 'CNY'),
+            )
+            .then((_) {}),
+      );
+      await waitFor(
+        tester,
+        ledger
+            .addTransfer(
+              fromAccountId: 1,
+              toAccountId: 2,
+              amount: const Money(1200, 'CNY'),
+            )
+            .then((_) {}),
+      );
+      await tester.tap(find.text('WeChat'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete account'));
+      await tester.pumpAndSettle();
+      expect(find.text('Delete WeChat?'), findsOneWidget);
+      expect(
+        find.text(
+          'This permanently deletes the account and its 2 entries, including 1 transfer with Alipay. Their balances will change.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Archive instead'), findsOneWidget);
+      await tester.tap(find.text('Delete account and 2 entries'));
+      await tester.pumpAndSettle();
+      expect(find.text('WeChat'), findsNothing);
+      expect(find.text('WeChat and 2 entries deleted'), findsOneWidget);
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+      expect(find.text('WeChat'), findsOneWidget);
+      expect(amount(const Money(-4000, 'CNY')), findsWidgets);
+      expect(amount(const Money(1200, 'CNY')), findsWidgets);
+    },
+  );
 }

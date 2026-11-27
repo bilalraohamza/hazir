@@ -6,6 +6,7 @@ import '../features/accounts/account_service.dart';
 import '../features/categories/category_service.dart';
 import '../features/fx/fx_service.dart';
 import '../features/fx/rates_api.dart';
+import '../features/ledger/deletion_service.dart';
 import '../features/ledger/ledger_service.dart';
 
 final databaseProvider = Provider<AppDatabase>((ref) {
@@ -24,6 +25,10 @@ final accountServiceProvider = Provider<AccountService>(
 
 final categoryServiceProvider = Provider<CategoryService>(
   (ref) => CategoryService(ref.watch(databaseProvider)),
+);
+
+final deletionServiceProvider = Provider<DeletionService>(
+  (ref) => DeletionService(ref.watch(databaseProvider)),
 );
 
 final ledgerServiceProvider = Provider<LedgerService>(
