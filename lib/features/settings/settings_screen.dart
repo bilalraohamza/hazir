@@ -8,6 +8,7 @@ import '../../app/providers.dart';
 import '../../data/db/app_database.dart';
 import '../../ui/theme/app_colors.dart';
 import '../../ui/widgets/category_icons.dart';
+import '../../ui/widgets/page_header.dart';
 import '../ledger/ledger_errors.dart';
 
 const _currencyNames = {'CNY': 'Yuan', 'PKR': 'Rupees', 'USD': 'Dollars'};
@@ -125,23 +126,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         categories.value?.where((category) => category.archived).toList() ??
         const <Category>[];
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          tooltip: 'Back',
-          onPressed: () {
-            final navigator = Navigator.of(context);
-            if (navigator.canPop()) {
-              navigator.pop();
-            } else {
-              context.go('/wealth');
-            }
-          },
-          icon: PhosphorIcon(
-            PhosphorIconsRegular.caretLeft,
-            color: colors.ink,
-            size: 18,
-          ),
-        ),
+      appBar: PageHeader(
+        onBack: () {
+          final navigator = Navigator.of(context);
+          if (navigator.canPop()) {
+            navigator.pop();
+          } else {
+            context.go('/wealth');
+          }
+        },
         title: const Text('Settings'),
       ),
       body: SafeArea(

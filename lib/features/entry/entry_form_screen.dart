@@ -24,9 +24,11 @@ class EntryFormScreen extends ConsumerStatefulWidget {
     super.key,
     this.initialKind = 'expense',
     this.editTransactionId,
+    this.initialDate,
   });
   final String initialKind;
   final int? editTransactionId;
+  final DateTime? initialDate;
   @override
   ConsumerState<EntryFormScreen> createState() => _EntryFormState();
 }
@@ -46,7 +48,7 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
   final rateFocus = FocusNode();
   bool editingRate = false;
   int? source, destination, category;
-  DateTime date = DateTime.now();
+  late DateTime date = widget.initialDate ?? DateTime.now();
   bool busy = false, rateEdited = false;
   final errors = <String, String>{};
   AppColors get colors => Theme.of(context).extension<AppColors>()!;

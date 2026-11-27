@@ -10,6 +10,7 @@ import '../../core/money/money.dart';
 import '../../data/db/app_database.dart';
 import '../../ui/theme/app_colors.dart';
 import '../../ui/widgets/amount_text.dart';
+import '../../ui/widgets/page_header.dart';
 import '../entry/entry_form_screen.dart';
 
 class _ExpenseRow {
@@ -115,16 +116,8 @@ class CategoryEntriesScreen extends ConsumerWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          tooltip: 'Back',
-          onPressed: () => Navigator.pop(context),
-          icon: PhosphorIcon(
-            PhosphorIconsRegular.caretLeft,
-            color: colors.ink,
-            size: 18,
-          ),
-        ),
+      appBar: PageHeader(
+        onBack: () => Navigator.pop(context),
         title: Text(category.name),
       ),
       body: SafeArea(

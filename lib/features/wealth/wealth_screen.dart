@@ -10,6 +10,8 @@ import '../../app/providers.dart';
 import '../../core/money/money.dart';
 import '../../ui/theme/app_colors.dart';
 import '../../ui/widgets/amount_text.dart';
+import '../../ui/widgets/add_entry_button.dart';
+import '../../ui/widgets/page_header.dart';
 import '../ledger/ledger_errors.dart';
 import '../ledger/ledger_service.dart';
 import 'account_edit_sheet.dart';
@@ -60,31 +62,18 @@ class _WealthScreenState extends ConsumerState<WealthScreen> {
     final total = canShowTotal ? summary?.total : null;
 
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        toolbarHeight: 48,
-        titleSpacing: 18,
+      appBar: PageHeader(
         title: currency == null
-            ? null
+            ? const SizedBox.shrink()
             : Text(
                 combined
                     ? 'Everything you have, in ${_currencyName(currency)}'
                     : 'Everything you have',
                 style: muted,
               ),
-        actions: [
-          IconButton(
-            tooltip: 'Settings',
-            onPressed: () => context.push('/settings'),
-            icon: PhosphorIcon(
-              PhosphorIconsDuotone.gearSix,
-              color: colors.muted,
-              duotoneSecondaryColor: colors.muted,
-              duotoneSecondaryOpacity: .2,
-            ),
-          ),
-          const SizedBox(width: 6),
-        ],
+      ),
+      floatingActionButton: AddEntryButton(
+        onPressed: () => context.push('/entry?kind=transfer'),
       ),
       body: SafeArea(
         top: false,

@@ -1,3 +1,4 @@
+import 'package:budget_app/features/entry/entry_form_screen.dart';
 import 'package:budget_app/core/money/money.dart';
 import 'package:budget_app/features/fx/fx_service.dart';
 import 'package:budget_app/features/ledger/ledger_service.dart';
@@ -208,4 +209,21 @@ void main() {
       );
     },
   );
+
+  testWidgets('past month add actions default to its last day at noon', (
+    tester,
+  ) async {
+    await show(tester, today: december);
+    await tap(tester, find.byTooltip('Previous month'));
+    for (final add in [find.byTooltip('Add entry'), find.text('Add expense')]) {
+      await tap(tester, add);
+      final form = tester.widget<EntryFormScreen>(find.byType(EntryFormScreen));
+      expect(form.initialDate, DateTime(2026, 11, 30, 12));
+      await tap(tester, find.byTooltip('Close'));
+    }
+    await tap(tester, find.byTooltip('Next month'));
+    await tap(tester, find.byTooltip('Add entry'));
+    final form = tester.widget<EntryFormScreen>(find.byType(EntryFormScreen));
+    expect(form.initialDate, december);
+  });
 }

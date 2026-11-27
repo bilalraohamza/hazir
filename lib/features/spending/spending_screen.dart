@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -8,6 +7,8 @@ import '../../app/providers.dart';
 import '../../core/money/money.dart';
 import '../../ui/theme/app_colors.dart';
 import '../../ui/widgets/amount_text.dart';
+import '../../ui/widgets/add_entry_button.dart';
+import '../../ui/widgets/page_header.dart';
 import '../../ui/widgets/category_icons.dart';
 import '../entry/entry_form_screen.dart';
 import '../ledger/ledger_service.dart';
@@ -39,6 +40,19 @@ class _SpendingScreenState extends ConsumerState<SpendingScreen> {
     setState(() => month = DateTime(month.year, month.month + delta));
   }
 
+  void addExpense() {
+    final today = now;
+    final currentMonth = DateTime(today.year, today.month);
+    final date = month.isBefore(currentMonth)
+        ? DateTime(month.year, month.month + 1, 0, 12)
+        : today;
+    Navigator.of(context, rootNavigator: true).push(
+      MaterialPageRoute<void>(
+        builder: (_) => EntryFormScreen(initialDate: date),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final today = now;
@@ -47,9 +61,8 @@ class _SpendingScreenState extends ConsumerState<SpendingScreen> {
     final currency = ref.watch(mainCurrencyProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        titleSpacing: 6,
+      appBar: PageHeader(
+        titleSpacing: 0,
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -83,20 +96,8 @@ class _SpendingScreenState extends ConsumerState<SpendingScreen> {
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            tooltip: 'Settings',
-            onPressed: () => context.push('/settings'),
-            icon: PhosphorIcon(
-              PhosphorIconsDuotone.gearSix,
-              color: colors.muted,
-              duotoneSecondaryColor: colors.muted,
-              duotoneSecondaryOpacity: .2,
-            ),
-          ),
-          const SizedBox(width: 6),
-        ],
       ),
+      floatingActionButton: AddEntryButton(onPressed: addExpense),
       body: SafeArea(
         top: false,
         child: spending.value == null || currency.value == null
@@ -177,11 +178,7 @@ class _SpendingScreenState extends ConsumerState<SpendingScreen> {
             backgroundColor: colors.brass,
             foregroundColor: colors.onBrass,
           ),
-          onPressed: () => Navigator.of(context, rootNavigator: true).push(
-            MaterialPageRoute<void>(
-              builder: (_) => const EntryFormScreen(initialKind: 'expense'),
-            ),
-          ),
+          onPressed: addExpense,
           child: const Text('Add expense'),
         ),
       ],

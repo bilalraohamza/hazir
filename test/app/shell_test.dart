@@ -92,4 +92,47 @@ void main() {
     await tester.pumpAndSettle();
     expect(fixture.api.calls, 2);
   });
+
+  testWidgets('all five tabs align their 48-pixel settings button', (
+    tester,
+  ) async {
+    await start(tester);
+    final gear = find.byTooltip('Settings');
+    final center = tester.getCenter(gear);
+    expect(tester.getSize(gear), const Size(48, 48));
+    for (final tab in ['Chat', 'Spending', 'Goals', 'Upcoming', 'Wealth']) {
+      await tester.tap(find.text(tab).last);
+      await tester.pumpAndSettle();
+      expect(tester.getCenter(gear), center, reason: tab);
+    }
+  });
+
+  testWidgets(
+    'Chat, Wealth and Spending align their add buttons and open preset kinds',
+    (tester) async {
+      await start(tester);
+      final add = find.byTooltip('Add entry');
+      final center = tester.getCenter(add);
+      for (final (tab, kind) in [
+        ('Wealth', 'transfer'),
+        ('Chat', 'expense'),
+        ('Spending', 'expense'),
+      ]) {
+        await tester.tap(find.text(tab).last);
+        await tester.pumpAndSettle();
+        expect(tester.getCenter(add), center, reason: tab);
+        expect(tester.getSize(add), const Size(56, 56));
+        await tester.tap(add);
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<EntryFormScreen>(find.byType(EntryFormScreen))
+              .initialKind,
+          kind,
+        );
+        await tester.tap(find.byTooltip('Close'));
+        await tester.pumpAndSettle();
+      }
+    },
+  );
 }
