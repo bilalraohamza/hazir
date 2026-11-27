@@ -131,7 +131,8 @@ void main() {
       await tap(t, 'From');
       await tap(t, 'Pakistani bank, PKR');
       await t.enterText(find.byKey(const Key('Amount')), '5000');
-      await tap(t, 'Rate');
+      await t.tap(find.byTooltip('Rate'));
+      await t.pumpAndSettle();
       await t.enterText(find.byKey(const Key('Rate')), '0.025');
       expect(
         t.widget<TextField>(find.byKey(const Key('Received'))).controller!.text,

@@ -7,6 +7,7 @@ import '../../core/money/money.dart';
 import '../../data/db/app_database.dart';
 import '../../ui/theme/app_colors.dart';
 import '../../ui/widgets/amount_text.dart';
+import '../../ui/widgets/money_input.dart';
 import '../ledger/ledger_errors.dart';
 
 class AccountEditSheet extends ConsumerStatefulWidget {
@@ -32,10 +33,12 @@ class AccountEditSheet extends ConsumerStatefulWidget {
 class _AccountEditSheetState extends ConsumerState<AccountEditSheet> {
   late final name = TextEditingController(text: widget.account?.name);
   late final opening = TextEditingController(
-    text: formatMoney(
-      Money(widget.account?.openingMinor ?? 0, currency),
-      withSymbol: false,
-    ),
+    text: (widget.account?.openingMinor ?? 0) == 0
+        ? ''
+        : formatMoney(
+            Money(widget.account!.openingMinor, currency),
+            withSymbol: false,
+          ),
   );
   late String currency = widget.account?.currency ?? 'CNY';
   final errors = <String, String>{};
@@ -62,7 +65,9 @@ class _AccountEditSheetState extends ConsumerState<AccountEditSheet> {
     }
     final Money balance;
     try {
-      balance = Money.parse(opening.text, currency);
+      balance = opening.text.isEmpty
+          ? Money(0, currency)
+          : Money.parse(opening.text, currency);
     } on FormatException catch (error) {
       setState(() => errors['Opening balance'] = error.message);
       return;
@@ -235,19 +240,24 @@ class _AccountEditSheetState extends ConsumerState<AccountEditSheet> {
                       : Text(currency, style: theme.textTheme.titleSmall),
                 ),
               ),
+              if (!adding)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    "Currency can't be changed after creating the account.",
+                    style: muted,
+                  ),
+                ),
               field(
                 'Opening balance',
-                TextField(
-                  key: const Key('opening-balance'),
+                MoneyInput(
+                  inputKey: const Key('opening-balance'),
+                  currency: currency,
+                  allowNegative: true,
                   controller: opening,
                   enabled: !busy,
                   textAlign: TextAlign.end,
                   style: amountNumberStyle(colors.ink, 16),
-                  keyboardType: const TextInputType.numberWithOptions(
-                    signed: true,
-                    decimal: true,
-                  ),
-                  decoration: placeholder('0'),
                   onChanged: (_) =>
                       setState(() => errors.remove('Opening balance')),
                 ),

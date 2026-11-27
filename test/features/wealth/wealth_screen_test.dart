@@ -223,4 +223,56 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Archived'), findsNothing);
   });
+
+  testWidgets(
+    'opening balance starts empty, limits decimals, and formats on blur',
+    (tester) async {
+      await open(tester);
+      final add = find.text('Add account');
+      await tester.ensureVisible(add);
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      final field = find.byKey(const Key('opening-balance'));
+      final controller = tester.widget<TextField>(field).controller!;
+      expect(controller.text, isEmpty);
+      expect(tester.widget<TextField>(field).decoration!.hintText, '0.00');
+      await tester.enterText(field, '5000');
+      expect(controller.text, '5000');
+      await tester.enterText(field, '5000.12');
+      await tester.enterText(field, '5000.123');
+      expect(controller.text, '5000.12');
+      await tester.tap(find.byKey(const Key('account-name')));
+      await tester.pumpAndSettle();
+      expect(controller.text, '5,000.12');
+    },
+  );
+
+  testWidgets(
+    'tapping an existing opening balance selects it for replacement',
+    (tester) async {
+      await open(tester);
+      await waitFor(
+        tester,
+        providers(tester)
+            .read(accountServiceProvider)
+            .setOpeningBalance(1, const Money(500000, 'CNY')),
+      );
+      await tester.tap(find.text('WeChat'));
+      await tester.pumpAndSettle();
+      final field = find.byKey(const Key('opening-balance'));
+      final controller = tester.widget<TextField>(field).controller!;
+      expect(controller.text, '5,000.00');
+      await tester.tap(field);
+      await tester.pumpAndSettle();
+      expect(controller.text, '5000.00');
+      expect(
+        controller.selection,
+        TextSelection(baseOffset: 0, extentOffset: controller.text.length),
+      );
+      await tester.enterText(field, '−1.25');
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+      expect(amount(const Money(-125, 'CNY')), findsWidgets);
+    },
+  );
 }

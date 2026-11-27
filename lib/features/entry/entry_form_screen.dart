@@ -4,6 +4,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../ui/widgets/amount_text.dart';
 import '../../ui/widgets/category_icons.dart';
+import '../../ui/widgets/money_input.dart';
 
 import 'package:decimal/decimal.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -522,19 +523,13 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
                 ),
               ),
               IntrinsicWidth(
-                child: TextField(
-                  key: const Key('Amount'),
+                child: MoneyInput(
+                  inputKey: const Key('Amount'),
+                  currency: currency.code,
                   controller: amount,
                   autofocus: true,
                   cursorHeight: 52,
                   style: style,
-                  decoration: InputDecoration.collapsed(
-                    hintText: '0',
-                    hintStyle: style.copyWith(color: colors.muted),
-                  ),
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
                   onChanged: (_) => change(syncConversion),
                 ),
               ),
@@ -654,14 +649,11 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
                 style: amountNumberStyle(colors.ink, 28),
               ),
               Expanded(
-                child: TextField(
-                  key: const Key('Received'),
+                child: MoneyInput(
+                  inputKey: const Key('Received'),
+                  currency: to.currency,
                   controller: received,
                   style: amountNumberStyle(colors.ink, 28),
-                  decoration: plain('0'),
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
                   onChanged: (_) => change(() {
                     rateEdited = false;
                     syncConversion();
@@ -672,17 +664,14 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
               if (editingRate)
                 SizedBox(
                   width: 100,
-                  child: TextField(
-                    key: const Key('Rate'),
+                  child: MoneyInput(
+                    inputKey: const Key('Rate'),
+                    selectOnFocus: true,
                     focusNode: rateFocus,
                     autofocus: true,
                     controller: rate,
                     textAlign: TextAlign.end,
                     style: amountNumberStyle(colors.ink, 18),
-                    decoration: plain('Rate'),
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
                     onChanged: (_) => change(() {
                       rateEdited = true;
                       syncConversion();
@@ -690,18 +679,24 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
                   ),
                 )
               else
-                InkWell(
-                  onTap: () => setState(() => editingRate = true),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 100),
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerRight,
-                        child: Text(
-                          displayRate.isEmpty ? 'Rate' : displayRate,
-                          style: amountNumberStyle(colors.ink, 18),
+                Tooltip(
+                  message: 'Rate',
+                  child: InkWell(
+                    onTap: () => setState(() => editingRate = true),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 100),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            displayRate.isEmpty ? '0.00' : displayRate,
+                            style: amountNumberStyle(
+                              displayRate.isEmpty ? colors.muted : colors.ink,
+                              18,
+                            ),
+                          ),
                         ),
                       ),
                     ),
