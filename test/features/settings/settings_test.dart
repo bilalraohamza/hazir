@@ -122,9 +122,8 @@ void main() {
       await tester.tapAt(const Offset(20, 80));
       await tester.pumpAndSettle();
       await tap(tester, find.text('Income'));
-      await tap(tester, find.text('More'));
-      expect(pickerLabels(tester), contains('Other'));
-      expect(pickerLabels(tester), isNot(contains('Misc')));
+      expect(find.text('Other'), findsOneWidget);
+      expect(find.text('Misc'), findsNothing);
     },
   );
 

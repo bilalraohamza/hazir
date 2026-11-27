@@ -19,5 +19,11 @@ class AppDatabase extends _$AppDatabase {
     beforeOpen: (_) => customStatement('PRAGMA foreign_keys = ON'),
   );
 
-  Future<void> seedIfEmpty() => transaction(() => _seedIfEmpty(this));
+  Future<void> seedIfEmpty() => transaction(() async {
+    await _seedIfEmpty(this);
+    await (update(categories)..where(
+          (row) => row.name.equals('Other') & row.iconKey.equals('dotsThree'),
+        ))
+        .write(const CategoriesCompanion(iconKey: Value('tag')));
+  });
 }

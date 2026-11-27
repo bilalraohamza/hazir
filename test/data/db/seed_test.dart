@@ -75,4 +75,43 @@ void main() {
       expect((setting.key, setting.value), ('mainCurrency', 'CNY'));
     },
   );
+
+  test(
+    'startup upgrades only legacy Other icons without a schema change',
+    () async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      await db.seedIfEmpty();
+      final others = db.select(db.categories)
+        ..where((row) => row.name.equals('Other'));
+      expect((await others.get()).map((row) => row.iconKey), ['tag', 'tag']);
+      await (db.update(db.categories)..where(
+            (row) => row.name.equals('Other') & row.kind.equals('expense'),
+          ))
+          .write(const CategoriesCompanion(iconKey: Value('dotsThree')));
+      await (db.update(db.categories)..where(
+            (row) => row.name.equals('Other') & row.kind.equals('income'),
+          ))
+          .write(const CategoriesCompanion(iconKey: Value('heart')));
+      final renamed = await db
+          .into(db.categories)
+          .insert(
+            CategoriesCompanion.insert(
+              name: 'Misc',
+              kind: 'expense',
+              iconKey: 'dotsThree',
+            ),
+          );
+      await db.seedIfEmpty();
+      final first = await db.select(db.categories).get();
+      await db.seedIfEmpty();
+      expect(await db.select(db.categories).get(), first);
+      expect((await others.get()).map((row) => row.iconKey), ['tag', 'heart']);
+      expect(
+        first.singleWhere((row) => row.id == renamed).iconKey,
+        'dotsThree',
+      );
+      expect(db.schemaVersion, 1);
+    },
+  );
 }

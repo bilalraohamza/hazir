@@ -25,7 +25,7 @@ const _categories = {
     'Entertainment': 'filmStrip',
     'Gifts': 'gift',
     'Sending home': 'paperPlaneTilt',
-    'Other': 'dotsThree',
+    'Other': 'tag',
   },
   'income': {
     'Scholarship/Stipend': 'graduationCap',
@@ -33,7 +33,7 @@ const _categories = {
     'Part-time work': 'briefcase',
     'Gift': 'gift',
     'Refund': 'arrowUUpLeft',
-    'Other': 'dotsThree',
+    'Other': 'tag',
   },
 };
 

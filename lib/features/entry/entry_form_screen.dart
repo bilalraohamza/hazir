@@ -18,6 +18,7 @@ import '../../core/money/money.dart';
 import '../../data/db/app_database.dart';
 import '../../ui/theme/app_colors.dart';
 import '../ledger/ledger_errors.dart';
+import '../categories/category_edit_sheet.dart';
 import '../ledger/ledger_service.dart';
 
 class EntryFormScreen extends ConsumerStatefulWidget {
@@ -379,8 +380,9 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
   Future<int?> choose(
     String title,
     Map<int, String> items,
-    int? selected,
-  ) async {
+    int? selected, {
+    bool allowNewCategory = false,
+  }) async {
     FocusManager.instance.primaryFocus?.unfocus();
     return showModalBottomSheet<int>(
       context: context,
@@ -406,6 +408,12 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
                           ? icon(PhosphorIconsDuotone.check, colors.ink)
                           : null,
                       onTap: () => Navigator.pop(sheet, e.key),
+                    ),
+                  if (allowNewCategory)
+                    ListTile(
+                      leading: icon(PhosphorIconsRegular.plus, colors.muted),
+                      title: const Text('New category'),
+                      onTap: () => Navigator.pop(sheet, 0),
                     ),
                 ],
               ),
@@ -540,13 +548,44 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
     );
   }
 
+  Future<void> createCategory() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    final db = ref.read(databaseProvider);
+    final id = await CategoryEditSheet.show(context, kind: kind);
+    if (id == null || !mounted) return;
+    final fresh = await (db.select(
+      db.categories,
+    )..where((row) => row.archived.equals(false))).get();
+    if (!mounted) return;
+    change(() {
+      categories = fresh;
+      category = id;
+    });
+  }
+
+  Future<void> moreCategories() async {
+    final id = await choose(
+      'Categories',
+      {for (final c in choices) c.id: c.name},
+      category,
+      allowNewCategory: true,
+    );
+    if (!mounted || id == null) return;
+    if (id == 0) {
+      await createCategory();
+    } else {
+      change(() => category = id);
+    }
+  }
+
   Widget grid() {
     final sorted = choices.toList()
       ..sort((a, b) {
         final cmp = (usage[b.id] ?? 0).compareTo(usage[a.id] ?? 0);
         return cmp == 0 ? a.id.compareTo(b.id) : cmp;
       });
-    final visible = sorted.take(7).toList();
+    final needsMore = sorted.length > 8;
+    final visible = needsMore ? sorted.take(7).toList() : sorted;
     final selected = choices.where((c) => c.id == category).firstOrNull;
     if (selected != null && !visible.contains(selected)) visible[6] = selected;
     return GridView.count(
@@ -555,7 +594,7 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
       crossAxisCount: 4,
       mainAxisSpacing: 6,
       crossAxisSpacing: 6,
-      mainAxisExtent: 62,
+      mainAxisExtent: 72,
       children: [
         for (final c in visible)
           tile(
@@ -564,45 +603,72 @@ class _EntryFormState extends ConsumerState<EntryFormScreen> {
             c.id == category,
             () => change(() => category = c.id),
           ),
-        for (int i = visible.length; i < 7; i++) const SizedBox.shrink(),
-        tile('More', PhosphorIconsDuotone.dotsThree, false, () async {
-          final id = await choose('Categories', {
-            for (final c in choices) c.id: c.name,
-          }, category);
-          if (id != null && mounted) change(() => category = id);
-        }),
+        if (needsMore)
+          tile('More', PhosphorIconsDuotone.dotsThree, false, moreCategories)
+        else if (visible.length < 8)
+          tile(
+            'New',
+            PhosphorIconsRegular.plus,
+            false,
+            createCategory,
+            dashed: true,
+          ),
       ],
     );
   }
 
-  Widget tile(String label, IconData glyph, bool active, VoidCallback tap) {
-    final ink = active ? colors.onBrass : colors.ink;
-    return Material(
-      color: active ? colors.brass : colors.surface,
-      shape: RoundedRectangleBorder(
-        side: BorderSide(color: active ? colors.brass : colors.rule, width: .7),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: tap,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            icon(glyph, ink),
-            const SizedBox(height: 3),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 3),
-              child: Text(
-                label,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.labelSmall!
-                    .copyWith(color: ink),
+  Widget tile(
+    String label,
+    IconData glyph,
+    bool active,
+    VoidCallback tap, {
+    bool dashed = false,
+  }) {
+    final ink = dashed
+        ? colors.muted
+        : active
+        ? colors.onBrass
+        : colors.ink;
+    return CustomPaint(
+      foregroundPainter: dashed ? _DashedTileBorder(colors.muted) : null,
+      child: Material(
+        color: dashed
+            ? colors.ground
+            : active
+            ? colors.brass
+            : colors.surface,
+        shape: RoundedRectangleBorder(
+          side: dashed
+              ? BorderSide.none
+              : BorderSide(
+                  color: active ? colors.brass : colors.rule,
+                  width: .7,
+                ),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: tap,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              icon(glyph, ink),
+              const SizedBox(height: 3),
+              Flexible(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                  child: Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall!
+                        .copyWith(color: ink),
+                  ),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -859,4 +925,35 @@ class _AmountController extends TextEditingController {
       ],
     );
   }
+}
+
+class _DashedTileBorder extends CustomPainter {
+  const _DashedTileBorder(this.color);
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..addRRect(
+        RRect.fromRectAndRadius(
+          (Offset.zero & size).deflate(.5),
+          const Radius.circular(10),
+        ),
+      );
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = .7;
+    final outline = path.computeMetrics().single;
+    for (double start = 0; start < outline.length; start += 6) {
+      canvas.drawPath(
+        outline.extractPath(start, (start + 3).clamp(0, outline.length)),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedTileBorder oldDelegate) =>
+      color != oldDelegate.color;
 }

@@ -242,4 +242,81 @@ void main() {
       expect((await rows(t)).single.toAmountMinor, 12201);
     },
   );
+
+  List<String?> gridLabels(WidgetTester tester) => tester
+      .widgetList<Text>(
+        find.descendant(of: find.byType(GridView), matching: find.byType(Text)),
+      )
+      .map((item) => item.data)
+      .toList();
+
+  testWidgets(
+    'income grid shows six categories and New in equal-height tiles',
+    (t) async {
+      await open(t);
+      await tap(t, 'Income');
+      expect(gridLabels(t), [
+        'Scholarship/Stipend',
+        'From family',
+        'Part-time work',
+        'Gift',
+        'Refund',
+        'Other',
+        'New',
+      ]);
+      expect(find.text('More'), findsNothing);
+      final grid = t.widget<GridView>(find.byType(GridView));
+      expect(
+        (grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount)
+            .mainAxisExtent,
+        greaterThan(62),
+      );
+    },
+  );
+
+  testWidgets(
+    'expense grid shows seven categories plus More and a create action in the sheet',
+    (t) async {
+      await open(t);
+      expect(gridLabels(t), [
+        'Food',
+        'Groceries',
+        'Transport',
+        'Rent',
+        'Bills',
+        'Shopping',
+        'Education',
+        'More',
+      ]);
+      await tap(t, 'More');
+      final sheetList = t.widget<ListView>(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.byType(ListView),
+        ),
+      );
+      final children =
+          (sheetList.childrenDelegate as SliverChildListDelegate).children;
+      expect(
+        (children.last as ListTile).title,
+        isA<Text>().having((item) => item.data, 'label', 'New category'),
+      );
+    },
+  );
+
+  testWidgets('creating a category from New selects it for the entry', (
+    t,
+  ) async {
+    await open(t);
+    await tap(t, 'Income');
+    await tap(t, 'New');
+    await t.enterText(find.byKey(const ValueKey('category-name')), 'Bonus');
+    await tap(t, 'Save');
+    expect(gridLabels(t), contains('Bonus'));
+    expect(gridLabels(t), contains('New'));
+    await t.enterText(find.byKey(const Key('Amount')), '28');
+    await tap(t, 'Save');
+    expect((await rows(t)).single.categoryId, 19);
+    expect((await rows(t)).single.kind, 'income');
+  });
 }
