@@ -2,6 +2,7 @@ import 'package:budget_app/core/money/money.dart';
 import 'package:budget_app/features/fx/fx_service.dart';
 import 'package:budget_app/features/ledger/ledger_service.dart';
 import 'package:budget_app/ui/widgets/amount_text.dart';
+import 'package:budget_app/ui/theme/app_colors.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -234,6 +235,15 @@ void main() {
       expect(tester.widget<FilledButton>(move).onPressed, isNull);
       await tap(tester, key('move-category-picker'));
       await tap(tester, find.text('Groceries').last);
+      final destination = find.descendant(
+        of: key('move-category-picker'),
+        matching: find.text('Groceries'),
+      );
+      final theme = Theme.of(tester.element(destination));
+      expect(
+        tester.widget<Text>(destination).style?.color,
+        theme.extension<AppColors>()!.ink,
+      );
       await tap(tester, move);
       expect(
         find.text('Food deleted, 1 entry moved to Groceries'),

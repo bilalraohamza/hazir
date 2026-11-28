@@ -205,7 +205,12 @@ class CategoryEditSheetState extends ConsumerState<CategoryEditSheet> {
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(destination?.name ?? 'Choose a category'),
+                    Text(
+                      destination?.name ?? 'Choose a category',
+                      style: destination == null
+                          ? muted
+                          : text.bodyMedium!.copyWith(color: colors.ink),
+                    ),
                     const SizedBox(width: 8),
                     PhosphorIcon(
                       PhosphorIconsRegular.caretRight,
