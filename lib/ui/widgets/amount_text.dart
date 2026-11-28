@@ -41,6 +41,7 @@ class AmountText extends StatelessWidget {
     );
     final small = style.copyWith(fontSize: size / 2);
     final raiseSymbol = hero ?? size >= 24;
+    final fullSizeMinus = raiseSymbol && m.isNegative;
 
     return Semantics(
       label: '$sign$symbol${digits.first}$decimals',
@@ -49,10 +50,14 @@ class AmountText extends StatelessWidget {
         TextSpan(
           style: style,
           children: [
+            if (fullSizeMinus) TextSpan(text: sign),
             if (raiseSymbol)
               WidgetSpan(
                 alignment: PlaceholderAlignment.top,
-                child: Text('$sign$symbol', style: small),
+                child: Text(
+                  fullSizeMinus ? symbol : '$sign$symbol',
+                  style: small,
+                ),
               )
             else
               TextSpan(text: '$sign$symbol'),

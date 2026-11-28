@@ -131,26 +131,47 @@ void main() {
     },
   );
 
-  testWidgets(
-    'AmountText preserves signed money formatting with hidden decimals',
-    (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: buildTheme(Brightness.dark),
-          home: const Scaffold(
-            body: AmountText(
-              Money(-2800, 'PKR'),
-              size: 32,
-              signed: true,
-              showDecimals: false,
-            ),
+  testWidgets('hero minus is full digit size and preserves signed formatting', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Brightness.dark),
+        home: const Scaffold(
+          body: AmountText(
+            Money(-2800, 'PKR'),
+            size: 32,
+            signed: true,
+            showDecimals: false,
           ),
         ),
-      );
-      expect(find.bySemanticsLabel('−₨28'), findsOneWidget);
-      expect(find.text('−₨'), findsOneWidget);
-    },
-  );
+      ),
+    );
+    expect(find.bySemanticsLabel('−₨28'), findsOneWidget);
+    final richText = tester
+        .widgetList<Text>(
+          find.descendant(
+            of: find.byType(AmountText),
+            matching: find.byType(Text),
+          ),
+        )
+        .singleWhere((widget) => widget.textSpan != null);
+    final root = richText.textSpan! as TextSpan;
+    final children = root.children!;
+    expect(
+      children.first,
+      isA<TextSpan>().having((span) => span.text, 'sign', '−'),
+    );
+    final sign = children.first as TextSpan;
+    final digits = children.whereType<TextSpan>().singleWhere(
+      (span) => span.text == '28',
+    );
+    expect(
+      root.style!.merge(sign.style).fontSize,
+      root.style!.merge(digits.style).fontSize,
+    );
+    expect(find.text('₨'), findsOneWidget);
+  });
 
   testWidgets('small amounts keep the signed symbol inline and mute zeros', (
     tester,
