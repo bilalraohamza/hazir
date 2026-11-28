@@ -205,3 +205,60 @@ test/agent/eval/messages.json          evaluation cases
 - [ ] **Step 3:** Rao runs it for the default model and for OpenRouter `z-ai/glm-5.3-flash:free` (if he has a key) and reports both accuracies. Target: at least 90% on logging cases and 100% "no wrong save" (a wrong account, amount or currency that would have been auto-saved counts as a critical failure). If the default model misses the target, switch the default to the better one or improve the prompt (bump `systemPromptVersion`) and rerun.
 - [ ] **Step 4:** build the signed release split APK, install as an update on Rao's phone, and check by hand: set up the key, log a lunch by chat, a Roman Urdu income, a PKR to CNY transfer with received amount, ask a spending question, Undo one entry, turn off internet and see the error card with Add manually.
 - [ ] **Step 5:** commit `test: agent evaluation set and script`.
+
+## Decisions from the understanding check (2026-11-28)
+
+These answers are part of the plan. Where they differ from a task above, these win.
+
+### Settings (Task 1)
+
+1. **Provider switching.** Zhipu and OpenRouter reapply their preset model and base URL each time Rao switches to them. Custom remembers its own last URL and model in the Settings keys `agentCustomBaseUrl` and `agentCustomModel`. Each provider keeps its own key (`apiKey.zhipu`, `apiKey.openRouter`, `apiKey.custom`). If the Custom URL's host changes, the Custom key is cleared and must be entered again. A Custom URL must use https; reject anything else with an inline error.
+2. **Threshold currency.** The threshold is stored with its own currency ("50000:CNY") and is never rewritten when the main currency changes. Settings shows and edits it in its own currency (money input with a currency picker). The save policy converts the entry amount into the threshold's currency using the latest available rate (today's snapshot or the most recent fallback), not the entry's `fxDay`, because this is a safety check and not accounting. Same currency needs no rate. No rate available means the entry counts as large. This replaces "converted to the main currency" in Global Constraints and Task 6.
+3. **Test connection and masking.** Task 1 does not show the Test connection button at all; Task 2 adds it. It tests the saved settings (every field saves when it is changed). The key row shows "••••" plus the last 4 characters, derived from secure storage when the screen opens and never stored anywhere else. Keys shorter than 8 characters show only "••••".
+4. **Android backup.** Disable platform backup and device transfer for all Hazir data in Task 1: `android:allowBackup="false"`, plus `android:dataExtractionRules` (Android 12+) and `android:fullBackupContent` (older) files that exclude every domain. Hazir's own encrypted backup comes in plan 5. Until then, data does not move to a new phone automatically.
+
+### Tools (Tasks 4 and 5)
+
+5. **Read tool semantics.** All dates are local. `from` is inclusive from the start of that day and `to` is inclusive to the end of that day; months are local calendar months. `get_spending` never includes transfers; its account filter applies to the expense's account. `get_entries` with an account filter matches either side of a transfer. `get_affordability` uses non-archived accounts (there are no credit accounts until plan 4; keep a single filter function so plan 4 can extend it). If some balances cannot be converted, it returns the converted total plus `partial: true` and the list of accounts left out, and the system prompt tells the model to say the answer is partial. There is no `get_worth_history` in plan 2; `get_balances` is the only worth tool, so drop "worth" from the read tools file map.
+6. **Write tool contract.** Task 4's `ToolSpec` has a `run` callback for read tools and `validate` and `execute` callbacks for write and destructive tools; exactly one of the two shapes is set (assert it). Task 5 may add pure, non-writing validation methods to the services, and the existing write paths must call the same validation so the rules exist in one place. Task 5's tool list is final. Opening-balance changes, unarchiving, account reordering and anything about credit stay manual in plan 2.
+7. **Assumptions.**
+   - Ask a short question when a required detail has no reasonable default: several accounts could fit, the currency cannot be told, or no category clearly fits.
+   - If Rao names the account, its currency is implied and is not an assumption. If he names no account and exactly one active account fits the currency, use it and list `account_id` in `assumed`.
+   - A clearly matching category is not an assumption.
+   - An omitted date means now and is not an assumption. Relative dates ("yesterday", "on monday") are resolved from the context date and are not assumptions.
+   - On Confirm, the loop validates again. If any shown value changed (names, money values, converted amount, or a destructive action's affected-entry counts), it does not execute: the old action becomes `failed` with reason `changed` in `resultJson`, and a new `pending` action with the fresh preview is added to the same turn for Rao to confirm.
+
+### Chat storage and the loop (Tasks 3 and 7)
+
+8. **Action ownership and retries.**
+   - Rename `ChatActions.messageId` to `turnId`: it references the **user** message that started the turn. The assistant's text is its own `ChatMessages` row. Actions therefore exist even when there is no assistant text (errors), and saved actions appear in Chat as soon as they are stored.
+   - "Try again" re-runs the same turn. It does not store a new user message.
+   - Inside one turn, a write whose tool name and normalized arguments equal one already saved in that turn is not executed again; the loop returns the earlier result.
+   - On a retry, the messages sent to the model include a note listing what this turn already saved, so the model does not repeat it.
+   - History: the "last 8 messages" are the 8 before the new user message (they do not include it). When an assistant reply had saved or confirmed actions, its history text gets a short appended line such as `[saved: expense 28.00 CNY, Food, WeChat, entry 41]`. This lets "undo that" or "make it 30" work.
+
+### Cards and the entry form (Task 8)
+
+9. **Undo and card states.** Cards read their entry live from the database by `transactionId`, so an edit made elsewhere shows on the card. If the entry was deleted elsewhere, the card shows "Deleted" in muted text with no actions. Undo is available on `saved` and `confirmed` entry actions for as long as the entry exists, and it survives restart (it deletes through DeletionService and marks the action `undone`). Account, category and settings changes, and destructive actions, get no Undo: their card shows "Done" in muted text.
+10. **Entry form and layouts.**
+    - Task 8 may extend the entry form: add an optional `EntryDraft initial` (kind, account, amount, currency, category, note, date, and transfer fields), and make the route return the saved transaction id when it closes.
+    - Manual fallback after an error: open the form as an expense with the typed text in the note. No guessing.
+    - Transfer card: arrows-left-right icon, title "Transfer", muted line "<from> to <to>, <time>", sent amount on the right and the received amount under it in muted text.
+    - Account, category and settings changes: a compact card with an icon and the summary text, and no amount.
+    - There is no mockup file in the repo; the written layout in this plan controls. The balance and "You can spend" header waits for plan 3. Chat only has the shared page header.
+11. **Existing UI and rollout.** Confirmed: Assistant goes first, above Appearance and Money; those sections, the theme setting and the Accounts and Categories pages stay as they are. Update the Wealth-first tests to Chat-first. Wealth and Spending keep the shared add button; Chat uses the input bar's "+". For Task 9, Codex builds the signed split APK; Rao installs it and does the phone check.
+
+### Evaluation and prompt (Tasks 7 and 9)
+
+12. **Scoring and deferred features.**
+    - A case passes only if the expected call happens and no other write is attempted. Read calls are allowed.
+    - Record the save policy decision for every write. A critical failure is any write that would have auto-saved with the wrong account, amount, currency or kind.
+    - Rate-limited or failed requests retry up to 3 times with backoff. After that the case counts as skipped: it is reported, but left out of the accuracy. A run is invalid if more than 10% of cases are skipped.
+    - Lending and borrowing: the assistant says debt tracking is coming in a later update and does not log it as income or spending. Budgets, upcoming bills and goals: it says they are not available yet. Replace the plan's "suggest logging it as a normal entry" line with this.
+
+### Package and API notes
+
+- **flutter_secure_storage:** use the latest stable version that resolves through the China mirror. Use the package's default Android options unless its current docs require a setting, and do not use deprecated options. It must build in both Hazir Dev and release. `minSdk` stays `flutter.minSdkVersion` (24).
+- **Zhipu thinking:** do not send `thinking` blindly. Add a small function that decides the field from provider and model, based on Zhipu's current docs: disabled for models that accept it, omitted for models that require thinking or are unknown. Unit-test it.
+- **Custom URL safety:** Dio must not follow redirects (`followRedirects: false`) and must treat a redirect as an error, so the key is never sent to another host. Never log request headers or bodies; no LogInterceptor.
+- **Drift:** before bumping to schema 2 in Task 3, dump and commit the v1 schema with drift_dev, and use it in the migration test.
