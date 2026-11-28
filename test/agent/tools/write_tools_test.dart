@@ -5,6 +5,7 @@ import 'package:budget_app/features/agent/settings/agent_settings.dart';
 import 'package:budget_app/features/agent/tools/account_tools.dart';
 import 'package:budget_app/features/agent/tools/category_tools.dart';
 import 'package:budget_app/features/agent/tools/entry_tools.dart';
+import 'package:budget_app/features/agent/tools/read_tools.dart';
 import 'package:budget_app/features/agent/tools/settings_tools.dart';
 import 'package:budget_app/features/agent/tools/tool_registry.dart';
 import 'package:budget_app/features/agent/tools/tool_spec.dart';
@@ -130,6 +131,7 @@ void main() {
     fx = FxService(db, _Rates(), clock: () => now);
     registry = ToolRegistry();
     final settings = AgentSettingsRepository(db, _KeyStore());
+    registerReadTools(registry, db, LedgerService(db, fx), fx);
     registerEntryTools(
       registry,
       db,
@@ -326,10 +328,13 @@ void main() {
   });
 
   test(
-    'previewChanged compares names, money, policy and delete counts by value',
+    'previewChanged compares names, money, dates and delete counts by value',
     () {
       final original = <String, Object?>{
         'account_name': 'Bank',
+        'account_id': 1,
+        'kind': 'expense',
+        'at': '2026-11-28T12:41:00',
         'amount': {'minor': 100, 'currency': 'PKR'},
         'policy_amount': {'minor': 2, 'currency': 'CNY'},
         'entry_count': 1,
@@ -341,7 +346,7 @@ void main() {
       for (final change in <String, Object?>{
         'account_name': 'New',
         'amount': {'minor': 101, 'currency': 'PKR'},
-        'policy_amount': null,
+        'at': '2026-11-29T12:41:00',
         'entry_count': 2,
       }.entries) {
         expect(
@@ -352,6 +357,38 @@ void main() {
       }
     },
   );
+
+  test('previewChanged ignores threshold conversion changes', () {
+    final original = {
+      'amount': {'minor': 100, 'currency': 'PKR'},
+      'policy_amount': {'minor': 2, 'currency': 'CNY'},
+    };
+    expect(
+      previewChanged(original, {
+        ...original,
+        'policy_amount': {'minor': 3, 'currency': 'CNY'},
+      }),
+      isFalse,
+    );
+  });
+
+  test('registry schemas declare IDs as integers and have no union types', () {
+    void checkSchema(Object? value) {
+      if (value is Map) {
+        expect(value['type'], isNot(isA<List>()));
+        for (final entry in value.entries) {
+          if (entry.key is String && (entry.key as String).endsWith('_id')) {
+            expect(entry.value, containsPair('type', 'integer'));
+          }
+          checkSchema(entry.value);
+        }
+      } else if (value is List) {
+        value.forEach(checkSchema);
+      }
+    }
+
+    checkSchema(registry.schemas());
+  });
 
   test(
     'execute rejects raw arguments and changes to a validated preview',

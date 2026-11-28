@@ -9,12 +9,7 @@ import 'tool_args.dart';
 import 'tool_registry.dart';
 import 'tool_spec.dart';
 
-const _id = {
-  'anyOf': [
-    {'type': 'integer'},
-    {'type': 'string', 'pattern': '^[0-9]+\$'},
-  ],
-};
+const _id = {'type': 'integer'};
 const _string = {'type': 'string'};
 const _kinds = {'expense', 'income', 'transfer'};
 

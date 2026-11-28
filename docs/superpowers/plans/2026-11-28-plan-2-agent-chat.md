@@ -18,7 +18,7 @@
 - Tool arguments carry amounts as decimal STRINGS ("28.50") plus a currency code, parsed with Money.parse. Never JSON numbers for money.
 - Accounts and categories are referenced by id in tool calls; the context gives the model the id list.
 - Every write goes through the existing services and their validation. A rejected call returns a structured tool error (code + message) to the model, never an exception to the UI.
-- Save policy (spec section 8): add_expense and add_income are saved immediately only when the amount converted to the main currency is below the large-amount threshold (default 500.00 CNY, adjustable), a rate is available for the conversion, and the model reports no assumed fields. Everything else (transfers, large or assumed entries, account and category changes, edits, deletes) is proposed and runs only after Rao taps Confirm. Deletes always show the existing delete warning text.
+- Save policy (spec section 8): add_expense and add_income are saved immediately only when the amount in the threshold currency is below the large-amount threshold (default 500.00 CNY, adjustable), a rate is available for the conversion, and the model reports no assumed fields. Everything else (transfers, large or assumed entries, account and category changes, edits, deletes) is proposed and runs only after Rao taps Confirm. Deletes always show the existing delete warning text.
 - Replies are always in English. Input may be English, Chinese or Roman Urdu, mixed.
 - Only the last 8 chat messages, the account and category lists, today's local date and time, and the main currency are sent per turn. Never the transaction history (queries go through read tools).
 - API keys live only in flutter_secure_storage. Never in the database, logs, crash text or source code.
@@ -155,9 +155,9 @@ test/agent/eval/messages.json          evaluation cases
 
 **Interfaces:**
 - `enum Decision { autoSave, propose }`
-- `class SavePolicy { Decision decide({required String toolName, required ToolKind kind, required Map<String,Object?> preview, required List<String> assumed, required Money threshold}); }`
-- Rules exactly as in Global Constraints. Converted main-currency amount missing counts as large.
-- [ ] Steps: table-driven failing tests (small clear expense auto, 499.99 auto, 500.00 propose, PKR equivalent above threshold propose, PKR with no rate propose, assumed field propose, every transfer propose, every non-entry write propose, destructive propose), implement, pass, commit `feat: save policy`.
+- `class SavePolicy { Decision decide({required String toolName, required ToolKind kind, required Map<String,Object?> preview, required Money threshold}); }`
+- Auto-save only for `add_expense` and `add_income` of kind `write` when the preview has an empty `assumed` list and a valid `policy_amount` in the threshold currency strictly below the threshold. A missing or malformed policy field, unavailable conversion, or zero threshold requires confirmation.
+- [x] Steps: table-driven failing tests (small clear expense auto, 499.99 auto, 500.00 propose, PKR equivalent above threshold propose, PKR with no rate propose, assumed field propose, every transfer propose, every non-entry write propose, destructive propose), implement, pass, commit `feat: save policy`.
 
 ### Task 7: Context, system prompt and agent loop
 
@@ -220,7 +220,7 @@ These answers are part of the plan. Where they differ from a task above, these w
 ### Settings (Task 1)
 
 1. **Provider switching.** Zhipu and OpenRouter reapply their preset model and base URL each time Rao switches to them. Custom remembers its own last URL and model in the Settings keys `agentCustomBaseUrl` and `agentCustomModel`. Each provider keeps its own key (`apiKey.zhipu`, `apiKey.openRouter`, `apiKey.custom`). If the Custom URL's host changes, the Custom key is cleared and must be entered again. A Custom URL must use https; reject anything else with an inline error.
-2. **Threshold currency.** The threshold is stored with its own currency ("50000:CNY") and is never rewritten when the main currency changes. Settings shows and edits it in its own currency (money input with a currency picker). The save policy converts the entry amount into the threshold's currency using the latest available rate (today's snapshot or the most recent fallback), not the entry's `fxDay`, because this is a safety check and not accounting. Same currency needs no rate. No rate available means the entry counts as large. This replaces "converted to the main currency" in Global Constraints and Task 6.
+2. **Threshold currency.** The threshold is stored with its own currency ("50000:CNY") and is never rewritten when the main currency changes. Settings shows and edits it in its own currency (money input with a currency picker). Write-tool validation converts the entry amount into the threshold's currency using the latest available rate (today's snapshot or the most recent fallback), not the entry's `fxDay`, because this is a safety check and not accounting. Same currency needs no rate. No rate available means the entry requires confirmation. The save policy consumes the converted `policy_amount` from the preview.
 3. **Test connection and masking.** Task 1 does not show the Test connection button at all; Task 2 adds it. It tests the saved settings (every field saves when it is changed). The key row shows "••••" plus the last 4 characters, derived from secure storage when the screen opens and never stored anywhere else. Keys shorter than 8 characters show only "••••".
 4. **Android backup.** Disable platform backup and device transfer for all Hazir data in Task 1: `android:allowBackup="false"`, plus `android:dataExtractionRules` (Android 12+) and `android:fullBackupContent` (older) files that exclude every domain. Hazir's own encrypted backup comes in plan 5. Until then, data does not move to a new phone automatically.
 

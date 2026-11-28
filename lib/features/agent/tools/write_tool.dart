@@ -14,7 +14,8 @@ bool previewChanged(Map oldPreview, Map newPreview) {
   Map shown(Map preview) {
     final fields = Map.of(preview)
       ..remove('arguments')
-      ..remove('previewed_at');
+      ..remove('previewed_at')
+      ..remove('policy_amount');
     // Only entries show a date. Other actions record when they were previewed.
     if (!fields.containsKey('kind') || !fields.containsKey('account_id')) {
       fields.remove('at');
@@ -130,9 +131,7 @@ void registerWriteTool(
         'properties': {
           for (final field in fields.entries)
             field.key: {
-              'type': field.key.endsWith('_id')
-                  ? ['integer', 'string']
-                  : 'string',
+              'type': field.key.endsWith('_id') ? 'integer' : 'string',
               'description': field.value,
             },
           'assumed': {
