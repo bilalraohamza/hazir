@@ -76,6 +76,36 @@ class AccountService {
     await _update(id, const AccountsCompanion(archived: Value(false)));
   });
 
+  Future<void> reorderAccounts(String currency, List<int> ids) =>
+      _db.transaction(() async {
+        final group =
+            await (_db.select(_db.accounts)
+                  ..where(
+                    (row) =>
+                        row.currency.equals(currency) &
+                        row.archived.equals(false),
+                  )
+                  ..orderBy([
+                    (row) => OrderingTerm.asc(row.sortOrder),
+                    (row) => OrderingTerm.asc(row.id),
+                  ]))
+                .get();
+        if (ids.length != group.length ||
+            ids.toSet().length != group.length ||
+            !ids.toSet().containsAll(group.map((row) => row.id))) {
+          throw const LedgerException(
+            'account_order_changed',
+            'The account list changed. Try again.',
+          );
+        }
+        for (final (index, id) in ids.indexed) {
+          await _update(
+            id,
+            AccountsCompanion(sortOrder: Value(group[index].sortOrder)),
+          );
+        }
+      });
+
   Future<Account> _account(int id) async {
     final account = await (_db.select(
       _db.accounts,

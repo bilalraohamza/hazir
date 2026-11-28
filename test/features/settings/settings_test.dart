@@ -52,6 +52,8 @@ void main() {
       delta,
       scrollable: find.byType(Scrollable),
     );
+    await tester.ensureVisible(row);
+    await tester.pumpAndSettle();
     await tap(tester, row);
   }
 
@@ -105,6 +107,7 @@ void main() {
     (tester) async {
       await open(tester);
       await tap(tester, find.byTooltip('Settings'));
+      await tap(tester, find.text('Categories'));
       await settingsRow(tester, key('category-12'));
       await tester.enterText(key('category-name'), 'Food');
       await tap(tester, find.text('Save'));
@@ -114,6 +117,7 @@ void main() {
       );
       await tester.enterText(key('category-name'), 'Misc');
       await tap(tester, find.text('Save'));
+      await tap(tester, find.byTooltip('Back'));
       await tap(tester, find.byTooltip('Back'));
       await entry(tester);
       await tap(tester, find.text('More'));
@@ -139,6 +143,7 @@ void main() {
       );
       await open(tester);
       await tap(tester, find.byTooltip('Settings'));
+      await tap(tester, find.text('Categories'));
       await tap(tester, key('category-1'));
       await tap(tester, find.text('Archive'));
       await tap(tester, find.text('Cancel'));
@@ -151,6 +156,7 @@ void main() {
           matching: find.text('Archive'),
         ),
       );
+      await tap(tester, find.byTooltip('Back'));
       await tap(tester, find.byTooltip('Back'));
       await entry(tester);
       expect(find.text('Food'), findsNothing);
@@ -166,6 +172,7 @@ void main() {
         const Money(2800, 'CNY'),
       );
       await tap(tester, find.byTooltip('Settings'));
+      await tap(tester, find.text('Categories'));
       await settingsRow(tester, find.text('Archived categories'));
       await settingsRow(tester, find.text('Unarchive'));
       expect(find.text('Archived categories'), findsNothing);
@@ -175,31 +182,21 @@ void main() {
   );
 
   testWidgets(
-    'adding a category saves the selected icon and displays it in Settings',
+    'adding a category saves the selected icon and displays it in Categories',
     (tester) async {
       await open(tester);
       await tap(tester, find.byTooltip('Settings'));
+      await tap(tester, find.text('Categories'));
       await settingsRow(tester, key('add-category-expense'));
       await tester.enterText(key('category-name'), 'Cafeteria');
       await tap(tester, key('category-icon-coffee'));
       await tap(tester, find.text('Save'));
       expect(find.text('Cafeteria'), findsOneWidget);
-      await tester.scrollUntilVisible(
-        find.text('Hazir 1.0.0'),
-        230,
-        scrollable: find.byType(Scrollable),
+      final categories = await tester.runAsync(
+        () => fixture.db.select(fixture.db.categories).get(),
       );
-      expect(find.text('Hazir 1.0.0'), findsOneWidget);
-      await tester.scrollUntilVisible(
-        find.text('Rates by ExchangeRate-API'),
-        80,
-        scrollable: find.byType(Scrollable),
-      );
-      expect(find.text('Rates by ExchangeRate-API'), findsOneWidget);
-      final categories = fixture.db.select(fixture.db.categories).get();
-      await tester.pump();
       expect(
-        (await categories)
+        categories!
             .singleWhere((category) => category.name == 'Cafeteria')
             .iconKey,
         'coffee',
@@ -219,6 +216,7 @@ void main() {
       );
       await open(tester);
       await tap(tester, find.byTooltip('Settings'));
+      await tap(tester, find.text('Categories'));
       await tap(tester, key('category-1'));
       await tap(tester, find.text('Delete category'));
       expect(
@@ -240,9 +238,67 @@ void main() {
       await tap(tester, find.text('Undo'));
       expect(key('category-1'), findsOneWidget);
       await tap(tester, find.byTooltip('Back'));
+      await tap(tester, find.byTooltip('Back'));
       await tap(tester, find.text('Spending'));
       expect(find.text('Food'), findsOneWidget);
       expect(find.text('Groceries'), findsNothing);
     },
   );
+
+  testWidgets(
+    'Settings shows Appearance and Money and opens both management pages',
+    (tester) async {
+      await open(tester);
+      await tap(tester, find.byTooltip('Settings'));
+      expect(
+        tester
+            .widgetList<Semantics>(find.byType(Semantics))
+            .where(
+              (item) => item.properties.header == true && item.child is Text,
+            )
+            .map((item) => (item.child! as Text).data),
+        ['Appearance', 'Money'],
+      );
+      expect(
+        find.text('Hazir 1.0.0. Rates by ExchangeRate-API'),
+        findsOneWidget,
+      );
+      await tap(tester, find.text('Categories'));
+      expect(find.text('Expense'), findsOneWidget);
+      await tap(tester, find.byTooltip('Back'));
+      await tap(tester, find.text('Accounts'));
+      expect(find.text('Add account'), findsOneWidget);
+    },
+  );
+
+  testWidgets('reordering accounts within CNY updates their order on Wealth', (
+    tester,
+  ) async {
+    await open(tester);
+    await tap(tester, find.byTooltip('Settings'));
+    await tap(tester, find.text('Accounts'));
+    final handle = key('reorder-2');
+    expect(handle, findsOneWidget);
+    final drag = await tester.startGesture(tester.getCenter(handle));
+    await tester.pump(const Duration(milliseconds: 600));
+    await drag.moveBy(const Offset(0, -16));
+    await tester.pumpAndSettle();
+    await drag.moveBy(const Offset(0, -25));
+    await tester.pump(const Duration(milliseconds: 350));
+    await drag.up();
+    await tester.pumpAndSettle();
+    final accounts = await tester.runAsync(
+      () => fixture.db.select(fixture.db.accounts).get(),
+    );
+    expect(
+      accounts!.singleWhere((item) => item.name == 'Alipay').sortOrder,
+      lessThan(accounts.singleWhere((item) => item.name == 'WeChat').sortOrder),
+    );
+    await tap(tester, find.byTooltip('Back'));
+    await tap(tester, find.byTooltip('Back'));
+    expect(
+      tester.getTopLeft(find.text('Alipay')).dy,
+      lessThan(tester.getTopLeft(find.text('WeChat')).dy),
+    );
+  });
 }
