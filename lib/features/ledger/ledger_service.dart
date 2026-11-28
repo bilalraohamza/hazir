@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:decimal/decimal.dart';
 import 'package:drift/drift.dart';
+import 'package:drift/extensions/native.dart';
 
 import '../../core/money/convert.dart';
 import '../../core/money/money.dart';
@@ -46,6 +47,8 @@ class WorthSummary {
     this.ratesStale, {
     this.convertedByCurrency = const {},
     this.snapshotDay,
+    this.missingCurrencies = const [],
+    this.convertedTotal,
   });
   final Money? total;
   final Map<String, Money> byCurrency;
@@ -53,6 +56,8 @@ class WorthSummary {
   final bool ratesStale;
   final Map<String, Money> convertedByCurrency;
   final String? snapshotDay;
+  final List<String> missingCurrencies;
+  final Money? convertedTotal;
 }
 
 class CategorySpend {
@@ -65,6 +70,22 @@ class CategorySpend {
   final Category category;
   final Money total;
   final int count;
+  final int unconvertedCount;
+}
+
+class SpendingSummary {
+  SpendingSummary(this.categories, {required String mainCurrency})
+    : total = categories.fold(
+        Money(0, categories.firstOrNull?.total.currency ?? mainCurrency),
+        (sum, item) => sum + item.total,
+      ),
+      unconvertedCount = categories.fold(
+        0,
+        (sum, item) => sum + item.unconvertedCount,
+      );
+
+  final List<CategorySpend> categories;
+  final Money total;
   final int unconvertedCount;
 }
 
@@ -285,7 +306,7 @@ class LedgerService {
         },
       )
       .watch()
-      .asyncMap((_) => _db.transaction(read));
+      .asyncMap((_) => read());
 
   static const _movements = '''
     WITH movements(account_id, currency, minor) AS (
@@ -298,7 +319,9 @@ class LedgerService {
     )
   ''';
 
-  Stream<List<AccountBalance>> watchBalances() => _watch(() async {
+  Stream<List<AccountBalance>> watchBalances() => _watch(balances);
+
+  Future<List<AccountBalance>> balances() async {
     final rows = await _db.customSelect('''
       $_movements
       SELECT a.*, SUM(m.minor) AS balance FROM accounts a
@@ -312,53 +335,79 @@ class LedgerService {
           Money(row.read<int>('balance'), row.read<String>('currency')),
         ),
     ];
-  });
+  }
 
-  Future<String> _mainCurrency() async => (await (_db.select(
+  Future<String> mainCurrency() async => (await (_db.select(
     _db.settings,
   )..where((s) => s.key.equals('mainCurrency'))).getSingle()).value;
 
-  Stream<WorthSummary> watchWorth() => _watch(() async {
-    final main = await _mainCurrency();
-    final rows = await _db.customSelect('''
+  Stream<WorthSummary> watchWorth() => _watch(() => worth());
+
+  Future<WorthSummary> worth({List<int>? accountIds}) =>
+      _db.transaction(() async {
+        final main = await mainCurrency();
+        final accountFilter = accountIds == null
+            ? ''
+            : 'WHERE account_id IN (SELECT value FROM json_each(?))';
+        final rows = await _db
+            .customSelect(
+              '''
       $_movements
-      SELECT currency, SUM(minor) AS balance FROM movements GROUP BY currency
-    ''').get();
-    final byCurrency = <String, Money>{};
-    final converted = <String, Money>{};
-    final snapshotDay = await _fx.latestSnapshotDay();
-    var total = Money(0, main);
-    var missing = false;
-    for (final row in rows) {
-      final currency = row.read<String>('currency');
-      final amount = Money(row.read<int>('balance'), currency);
-      byCurrency[currency] = amount;
-      if (currency == main || amount.minor == 0) {
-        final subtotal = Money(amount.minor, main);
-        converted[currency] = subtotal;
-        total += subtotal;
-        continue;
-      }
-      final rate = snapshotDay == null
-          ? null
-          : await _fx.rateForDay(currency, main, snapshotDay);
-      if (rate == null) {
-        missing = true;
-      } else {
-        final subtotal = convert(amount, rate, main);
-        converted[currency] = subtotal;
-        total += subtotal;
-      }
-    }
-    return WorthSummary(
-      missing ? null : total,
-      byCurrency,
-      missing,
-      await _fx.isStale(),
-      convertedByCurrency: converted,
-      snapshotDay: snapshotDay,
-    );
-  });
+      , balances_by_account AS (
+        SELECT account_id, currency, SUM(minor) AS balance FROM movements
+        $accountFilter GROUP BY account_id, currency
+      )
+      SELECT currency, SUM(balance) AS balance, MAX(balance <> 0) AS has_nonzero
+      FROM balances_by_account GROUP BY currency
+    ''',
+              variables: [
+                if (accountIds != null)
+                  Variable.withString(jsonEncode(accountIds)),
+              ],
+            )
+            .get();
+        final byCurrency = <String, Money>{};
+        final converted = <String, Money>{};
+        final snapshotDay = await _fx.latestSnapshotDay();
+        var total = Money(0, main);
+        final missingCurrencies = <String>[];
+        for (final row in rows) {
+          final currency = row.read<String>('currency');
+          final amount = Money(row.read<int>('balance'), currency);
+          byCurrency[currency] = amount;
+          // Wealth uses the currency subtotal. A filtered affordability query
+          // must also flag individually nonzero balances that cancel out.
+          final needsRate =
+              amount.minor != 0 ||
+              (accountIds != null && row.read<int>('has_nonzero') != 0);
+          if (currency == main || !needsRate) {
+            final subtotal = Money(amount.minor, main);
+            converted[currency] = subtotal;
+            total += subtotal;
+            continue;
+          }
+          final rate = snapshotDay == null
+              ? null
+              : await _fx.rateForDay(currency, main, snapshotDay);
+          if (rate == null) {
+            missingCurrencies.add(currency);
+          } else {
+            final subtotal = convert(amount, rate, main);
+            converted[currency] = subtotal;
+            total += subtotal;
+          }
+        }
+        return WorthSummary(
+          missingCurrencies.isEmpty ? total : null,
+          byCurrency,
+          missingCurrencies.isNotEmpty,
+          await _fx.isStale(),
+          convertedByCurrency: converted,
+          snapshotDay: snapshotDay,
+          missingCurrencies: missingCurrencies,
+          convertedTotal: total,
+        );
+      });
 
   (DateTime, DateTime) _monthBounds(DateTime month) {
     final local = month.toLocal();
@@ -368,42 +417,85 @@ class LedgerService {
     );
   }
 
-  Stream<List<Transaction>> watchEntries({int? categoryId, DateTime? month}) =>
-      _watch(() {
-        final query = _db.select(_db.transactions);
-        if (categoryId != null) {
-          query.where((t) => t.categoryId.equals(categoryId));
-        }
-        if (month != null) {
-          final (start, end) = _monthBounds(month);
-          query.where(
-            (t) =>
-                t.occurredAt.isBiggerOrEqualValue(start) &
-                t.occurredAt.isSmallerThanValue(end),
-          );
-        }
-        return (query..orderBy([
-              (t) => OrderingTerm.desc(t.occurredAt),
-              (t) => OrderingTerm.desc(t.id),
-            ]))
-            .get();
-      });
+  Stream<List<Transaction>> watchEntries({int? categoryId, DateTime? month}) {
+    final (from, to) = month == null ? (null, null) : _monthBounds(month);
+    return _watch(() => entries(categoryId: categoryId, from: from, to: to));
+  }
 
-  Stream<List<CategorySpend>> watchSpending(DateTime month) => _watch(() async {
-    final main = await _mainCurrency();
+  /// Bounds are inclusive at [from] and exclusive at [to].
+  Future<List<Transaction>> entries({
+    int? categoryId,
+    int? accountId,
+    String? kind,
+    DateTime? from,
+    DateTime? to,
+    String? noteContains,
+    int? limit,
+  }) {
+    final query = _db.select(_db.transactions);
+    if (categoryId != null) {
+      query.where((t) => t.categoryId.equals(categoryId));
+    }
+    if (accountId != null) {
+      query.where(
+        (t) =>
+            t.accountId.equals(accountId) |
+            (t.kind.equals('transfer') & t.toAccountId.equals(accountId)),
+      );
+    }
+    if (kind != null) {
+      query.where((t) => t.kind.equals(kind));
+    }
+    if (from != null) {
+      query.where((t) => t.occurredAt.isBiggerOrEqualValue(from));
+    }
+    if (to != null) {
+      query.where((t) => t.occurredAt.isSmallerThanValue(to));
+    }
+    if (noteContains != null && noteContains.isNotEmpty) {
+      query.where((t) => t.note.containsCase(noteContains));
+    }
+    query.orderBy([
+      (t) => OrderingTerm.desc(t.occurredAt),
+      (t) => OrderingTerm.desc(t.id),
+    ]);
+    if (limit != null) query.limit(limit);
+    return query.get();
+  }
+
+  Stream<List<CategorySpend>> watchSpending(DateTime month) {
     final (start, end) = _monthBounds(month);
-    const expenses =
-        "kind = 'expense' AND occurred_at >= ? AND occurred_at < ?";
-    final dates = [Variable.withDateTime(start), Variable.withDateTime(end)];
+    return _watch(() async => (await spending(start, end)).categories);
+  }
+
+  /// Bounds are inclusive at [from] and exclusive at [to].
+  Future<SpendingSummary> spending(
+    DateTime from,
+    DateTime to, {
+    int? accountId,
+    int? categoryId,
+  }) => _db.transaction(() async {
+    final main = await mainCurrency();
+    final expenses = [
+      "t.kind = 'expense' AND t.occurred_at >= ? AND t.occurred_at < ?",
+      if (accountId != null) 't.account_id = ?',
+      if (categoryId != null) 't.category_id = ?',
+    ].join(' AND ');
+    final filters = [
+      Variable.withDateTime(from),
+      Variable.withDateTime(to),
+      if (accountId != null) Variable.withInt(accountId),
+      if (categoryId != null) Variable.withInt(categoryId),
+    ];
     // Equal amounts with the same currency and day round identically. Convert
     // each distinct foreign amount once, then let SQL sum individual entries.
     final foreign = await _db
         .customSelect(
           '''
-      SELECT DISTINCT currency, fx_day, amount_minor FROM transactions
-      WHERE $expenses AND currency <> ? AND fx_day IS NOT NULL
+      SELECT DISTINCT t.currency, t.fx_day, t.amount_minor FROM transactions t
+      WHERE $expenses AND t.currency <> ? AND t.fx_day IS NOT NULL
     ''',
-          variables: [...dates, Variable.withString(main)],
+          variables: [...filters, Variable.withString(main)],
         )
         .get();
     final rates = <(String, String), Decimal?>{};
@@ -447,11 +539,11 @@ class LedgerService {
           variables: [
             Variable.withString(jsonEncode(conversions)),
             Variable.withString(main),
-            ...dates,
+            ...filters,
           ],
         )
         .get();
-    return [
+    return SpendingSummary([
       for (final row in rows)
         CategorySpend(
           _db.categories.map(row.data),
@@ -459,6 +551,6 @@ class LedgerService {
           row.read<int>('entries'),
           row.read<int>('unconverted'),
         ),
-    ];
+    ], mainCurrency: main);
   });
 }

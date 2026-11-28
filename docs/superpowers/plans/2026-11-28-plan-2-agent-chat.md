@@ -118,22 +118,23 @@ test/agent/eval/messages.json          evaluation cases
 
 ### Task 4: Tool framework and read tools
 
-**Files:** `tools/tool_spec.dart`, `tool_registry.dart`, `read_tools.dart`, `test/agent/tools/`
+**Files:** `tools/tool_spec.dart`, `tool_registry.dart`, `tool_args.dart`, `read_tools.dart`, `test/agent/tools/`
 
 **Interfaces:**
 - `enum ToolKind { read, write, destructive }`
-- `class ToolSpec { final String name; final String description; final Map<String,Object?> parameters; final ToolKind kind; final Future<ToolResult> Function(Map<String,Object?> args) run; }`
+- `class ToolSpec { final String name; final String description; final Map<String,Object?> parameters; final ToolKind kind; }` with nullable callbacks `run`, `validate`, and `execute`, each of type `Future<ToolResult> Function(Map<String,Object?> args)`
+- Read tools set only `run`. Write and destructive tools set both `validate` and `execute`. The constructor asserts the correct shape.
 - `sealed class ToolResult` with `ToolOk(Map<String,Object?> data)` and `ToolError(String code, String message)`; `toJson()` for the tool message.
 - `class ToolRegistry { void register(ToolSpec s); List<Map<String,Object?>> schemas(); ToolSpec? byName(String n); }`
 - Argument helpers that return ToolError instead of throwing: `money(args, 'amount', 'currency')`, `intId(args, 'account_id')`, `optionalDate(args, 'at')` (ISO local "2026-11-28T12:41" or "2026-11-28"), `stringList(args, 'assumed')`.
 - Read tools (all return computed values as both formatted strings and minor units):
-  - `list_accounts` (id, name, currency, archived), `list_categories` (id, name, kind),
-  - `get_balances` (per account and per currency, plus combined total in main currency or `rates_missing`),
+  - `list_accounts` (id, name, currency, archived), `list_categories` (id, name, kind, archived),
+  - `get_balances` (active account breakdown, totals including archived balances as on Wealth, combined total in main currency or `rates_missing` and the affected currencies),
   - `get_spending` (args: period `this_month` | `last_month` | `YYYY-MM`, optional category_id, account_id; returns total and per category with counts and unconverted count),
   - `get_entries` (args: optional category_id, account_id, kind, from, to, text contains in note, limit max 20),
   - `get_exchange_rate` (from, to; returns rate and day, or rates_missing),
-  - `get_affordability` (amount, currency): available = combined balance of non-archived, non-credit accounts in the main currency; returns available before and after, and a note that budget limits and upcoming expenses are not included yet (plan 3 extends this).
-- [ ] Steps: failing tests for each read tool against a seeded in-memory DB (including rates missing), argument helper errors (bad amount string "28,5.1", unknown id, bad date), implement, pass, commit `feat: tool registry and read tools`.
+  - `get_affordability` (amount, currency): available = combined balance of non-archived accounts in the main currency; returns available before and after, and a note that budget limits and upcoming expenses are not included yet (plan 3 extends this).
+- [x] Steps: failing tests for each read tool against a seeded in-memory DB (including rates missing), argument helper errors (bad amount string "28,5.1", unknown id, bad date), implement, pass, commit `feat: tool registry and read tools`.
 
 ### Task 5: Write tools
 

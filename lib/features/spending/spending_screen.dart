@@ -114,14 +114,9 @@ class _SpendingScreenState extends ConsumerState<SpendingScreen> {
   }
 
   Widget content(List<CategorySpend> categories, String main) {
-    final total = categories.fold(
-      Money(0, categories.firstOrNull?.total.currency ?? main),
-      (sum, item) => sum + item.total,
-    );
-    final excluded = categories.fold(
-      0,
-      (sum, item) => sum + item.unconvertedCount,
-    );
+    final summary = SpendingSummary(categories, mainCurrency: main);
+    final total = summary.total;
+    final excluded = summary.unconvertedCount;
     return SliverPadding(
       padding: const EdgeInsets.fromLTRB(18, 8, 18, 20),
       sliver: SliverList.list(
