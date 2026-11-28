@@ -262,7 +262,7 @@ void main() {
   );
 
   testWidgets(
-    'Settings shows Appearance and Money and opens both management pages',
+    'Settings shows Assistant, Appearance and Money and opens both management pages',
     (tester) async {
       await open(tester);
       await tap(tester, find.byTooltip('Settings'));
@@ -273,7 +273,7 @@ void main() {
               (item) => item.properties.header == true && item.child is Text,
             )
             .map((item) => (item.child! as Text).data),
-        ['Appearance', 'Money'],
+        ['Assistant', 'Appearance', 'Money'],
       );
       expect(
         find.text('Hazir 1.0.0. Rates by ExchangeRate-API'),

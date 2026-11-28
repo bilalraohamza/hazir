@@ -8,7 +8,9 @@ import '../../app/providers.dart';
 import '../../data/db/app_database.dart';
 import '../../ui/theme/app_colors.dart';
 import '../../ui/widgets/page_header.dart';
+import '../agent/settings/agent_settings.dart';
 import 'accounts_screen.dart';
+import 'assistant_settings_screen.dart';
 import 'categories_screen.dart';
 
 import 'theme_control.dart';
@@ -92,6 +94,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final accounts = ref.watch(settingsAccountsProvider).value;
     final categories = ref.watch(settingsCategoriesProvider).value;
     final version = ref.watch(_versionProvider).value;
+    final assistant = ref.watch(agentSettingsProvider).value;
     return Scaffold(
       appBar: PageHeader(
         onBack: () {
@@ -108,6 +111,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 6, 18, 20),
           children: [
+            section('Assistant', [
+              row(
+                leading: glyph(PhosphorIconsDuotone.sparkle),
+                title: const Text('AI assistant'),
+                trailing: value(
+                  (assistant?.provider ?? AgentProvider.zhipu).label,
+                  detail: assistant?.hasApiKey == true ? null : 'Not set up',
+                ),
+                onTap: () => open(const AssistantSettingsScreen()),
+              ),
+            ]),
             section('Appearance', [
               row(
                 leading: glyph(PhosphorIconsDuotone.sun),
@@ -206,10 +220,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     duotoneSecondaryOpacity: .2,
   );
 
-  Widget value(String label) => Row(
+  Widget value(String label, {String? detail}) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      Text(label, style: muted),
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(label, style: muted),
+          if (detail != null)
+            Text(detail, style: text.bodySmall!.copyWith(color: colors.muted)),
+        ],
+      ),
       const SizedBox(width: _valueCaretGap),
       PhosphorIcon(
         PhosphorIconsRegular.caretRight,
