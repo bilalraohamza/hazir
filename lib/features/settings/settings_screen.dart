@@ -13,6 +13,9 @@ import 'categories_screen.dart';
 
 import 'theme_control.dart';
 
+const _valueCaretGap = 8.0;
+const _valueCaretSize = 14.0;
+
 const _currencyNames = {'CNY': 'Yuan', 'PKR': 'Rupees', 'USD': 'Dollars'};
 
 final _versionProvider = FutureProvider.autoDispose<String>((ref) async {
@@ -109,7 +112,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               row(
                 leading: glyph(PhosphorIconsDuotone.sun),
                 title: const Text('Theme'),
-                trailing: const ThemeControl(),
+                trailing: const Padding(
+                  padding: EdgeInsets.only(
+                    right: _valueCaretGap + _valueCaretSize,
+                  ),
+                  child: ThemeControl(),
+                ),
               ),
             ]),
             section('Money', [
@@ -202,11 +210,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     mainAxisSize: MainAxisSize.min,
     children: [
       Text(label, style: muted),
-      const SizedBox(width: 8),
+      const SizedBox(width: _valueCaretGap),
       PhosphorIcon(
         PhosphorIconsRegular.caretRight,
         color: colors.muted,
-        size: 14,
+        size: _valueCaretSize,
       ),
     ],
   );

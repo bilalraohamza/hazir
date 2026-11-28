@@ -3,6 +3,7 @@ import 'package:budget_app/features/fx/fx_service.dart';
 import 'package:budget_app/features/ledger/ledger_service.dart';
 import 'package:budget_app/ui/widgets/amount_text.dart';
 import 'package:budget_app/ui/theme/app_colors.dart';
+import 'package:budget_app/features/settings/theme_control.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -285,6 +286,41 @@ void main() {
       expect(find.text('Add account'), findsOneWidget);
     },
   );
+
+  testWidgets('Accounts uses Wealth currency group names and colors', (
+    tester,
+  ) async {
+    await open(tester);
+    await tap(tester, find.byTooltip('Settings'));
+    await tap(tester, find.text('Accounts'));
+    for (final (name, code) in [
+      ('Yuan', 'CNY'),
+      ('Rupees', 'PKR'),
+      ('Dollars', 'USD'),
+    ]) {
+      final group = find.text(name);
+      expect(group, findsOneWidget);
+      final colors = Theme.of(tester.element(group)).extension<AppColors>()!;
+      expect(
+        tester.widget<Text>(group).style?.color,
+        currencyColor(colors, code),
+      );
+    }
+  });
+
+  testWidgets('theme control aligns with Settings values in both themes', (
+    tester,
+  ) async {
+    await open(tester);
+    await tap(tester, find.byTooltip('Settings'));
+    for (final mode in ['Light', 'Dark']) {
+      await tap(tester, find.text(mode));
+      expect(
+        tester.getRect(find.byType(ThemeControl)).right,
+        tester.getRect(find.text('Yuan CNY')).right,
+      );
+    }
+  });
 
   testWidgets('reordering accounts within CNY updates their order on Wealth', (
     tester,

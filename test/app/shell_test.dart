@@ -136,6 +136,104 @@ void main() {
     },
   );
 
+  Future<void> openScrollableWealth(WidgetTester tester) async {
+    tester.view.padding = const FakeViewPadding(bottom: 24);
+    tester.view.viewPadding = const FakeViewPadding(bottom: 24);
+    addTearDown(tester.view.resetPadding);
+    addTearDown(tester.view.resetViewPadding);
+    await tester.binding.setSurfaceSize(const Size(400, 600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await start(tester);
+  }
+
+  final wealthScroll = find.descendant(
+    of: find.byType(WealthScreen),
+    matching: find.byType(Scrollable),
+  );
+  final addButton = find.byTooltip('Add entry');
+
+  testWidgets(
+    'Wealth last row clears the visible add button after scrolling to the bottom',
+    (tester) async {
+      await openScrollableWealth(tester);
+      final position = tester.state<ScrollableState>(wealthScroll).position;
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pumpAndSettle();
+
+      final lastRow = find
+          .ancestor(
+            of: find.text('Add account'),
+            matching: find.byType(InkWell),
+          )
+          .first;
+      final button = tester.getRect(addButton);
+      expect(
+        button.bottom,
+        lessThan(tester.getTopLeft(find.text('Upcoming')).dy),
+      );
+      expect(tester.getRect(lastRow).bottom, lessThanOrEqualTo(button.top));
+    },
+  );
+
+  testWidgets(
+    'scrolling down slides the add button out and scrolling up brings it back',
+    (tester) async {
+      await openScrollableWealth(tester);
+      final original = tester.getRect(addButton);
+      await tester.timedDrag(
+        wealthScroll,
+        const Offset(0, -180),
+        const Duration(milliseconds: 100),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 60));
+      final partial = tester.getRect(addButton);
+      expect(partial.top, greaterThan(original.top));
+      expect(partial.top, lessThan(tester.getRect(wealthScroll).bottom));
+      await tester.pumpAndSettle();
+      expect(
+        tester.getRect(addButton).top,
+        greaterThanOrEqualTo(tester.getRect(wealthScroll).bottom),
+      );
+      await tester.drag(wealthScroll, const Offset(0, 90));
+      await tester.pumpAndSettle();
+      expect(tester.getRect(addButton), original);
+
+      await tester.drag(wealthScroll, const Offset(0, -120));
+      await tester.pumpAndSettle();
+      final position = tester.state<ScrollableState>(wealthScroll).position;
+      position.jumpTo(position.minScrollExtent);
+      await tester.pumpAndSettle();
+      expect(tester.getRect(addButton), original);
+    },
+  );
+
+  testWidgets(
+    'reduced motion hides and shows the add button without animation',
+    (tester) async {
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      await openScrollableWealth(tester);
+      final original = tester.getRect(addButton);
+      await tester.timedDrag(
+        wealthScroll,
+        const Offset(0, -180),
+        const Duration(milliseconds: 100),
+      );
+      await tester.pump();
+      expect(
+        tester.getRect(addButton).top,
+        greaterThanOrEqualTo(tester.getRect(wealthScroll).bottom),
+      );
+      await tester.drag(wealthScroll, const Offset(0, 90));
+      await tester.pump();
+      expect(tester.getRect(addButton), original);
+    },
+  );
+
   testWidgets(
     'dark theme applies immediately and survives rebuilding the app',
     (tester) async {

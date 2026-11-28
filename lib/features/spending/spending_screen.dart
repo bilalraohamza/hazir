@@ -60,7 +60,10 @@ class _SpendingScreenState extends ConsumerState<SpendingScreen> {
     final spending = ref.watch(_spendingProvider(month));
     final currency = ref.watch(mainCurrencyProvider);
 
-    return Scaffold(
+    final categories = spending.value;
+    final main = currency.value;
+
+    return AddEntryScaffold(
       appBar: PageHeader(
         titleSpacing: 0,
         title: Row(
@@ -97,17 +100,16 @@ class _SpendingScreenState extends ConsumerState<SpendingScreen> {
           ],
         ),
       ),
-      floatingActionButton: AddEntryButton(onPressed: addExpense),
-      body: SafeArea(
-        top: false,
-        child: spending.value == null || currency.value == null
-            ? Center(
-                child: spending.hasError || currency.hasError
-                    ? const Text('Could not load spending.')
-                    : const SizedBox.shrink(),
-              )
-            : content(spending.value!, currency.value!),
-      ),
+      onAdd: addExpense,
+      scrollKey: PageStorageKey(month),
+      slivers: [
+        if (categories != null && main != null) content(categories, main),
+      ],
+      fillRemaining:
+          (categories == null || main == null) &&
+              (spending.hasError || currency.hasError)
+          ? const Center(child: Text('Could not load spending.'))
+          : null,
     );
   }
 
@@ -120,38 +122,39 @@ class _SpendingScreenState extends ConsumerState<SpendingScreen> {
       0,
       (sum, item) => sum + item.unconvertedCount,
     );
-    return ListView(
-      key: PageStorageKey(month),
+    return SliverPadding(
       padding: const EdgeInsets.fromLTRB(18, 8, 18, 20),
-      children: [
-        Text('Spent in ${DateFormat('MMMM').format(month)}', style: muted),
-        const SizedBox(height: 5),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: AmountText(
-              total,
-              key: const Key('spending-total'),
-              size: 44,
-              showDecimals: false,
+      sliver: SliverList.list(
+        children: [
+          Text('Spent in ${DateFormat('MMMM').format(month)}', style: muted),
+          const SizedBox(height: 5),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: AmountText(
+                total,
+                key: const Key('spending-total'),
+                size: 44,
+                showDecimals: false,
+              ),
             ),
           ),
-        ),
-        if (excluded > 0)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              "$excluded entries in other currencies aren't included yet. They'll be added when exchange rates are available.",
-              style: muted,
+          if (excluded > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                "$excluded entries in other currencies aren't included yet. They'll be added when exchange rates are available.",
+                style: muted,
+              ),
             ),
-          ),
-        const SizedBox(height: 18),
-        if (categories.isEmpty)
-          empty()
-        else
-          for (final category in categories) categoryRow(category, total),
-      ],
+          const SizedBox(height: 18),
+          if (categories.isEmpty)
+            empty()
+          else
+            for (final category in categories) categoryRow(category, total),
+        ],
+      ),
     );
   }
 

@@ -7,6 +7,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../app/providers.dart';
+import '../../core/money/currency.dart';
 import '../../core/money/money.dart';
 import '../../ui/theme/app_colors.dart';
 import '../../ui/widgets/amount_text.dart';
@@ -22,16 +23,6 @@ final _balancesProvider = StreamProvider.autoDispose<List<AccountBalance>>(
 final _worthProvider = StreamProvider.autoDispose<WorthSummary>(
   (ref) => ref.watch(ledgerServiceProvider).watchWorth(),
 );
-
-String _currencyName(String code, {bool upper = false}) {
-  final name = switch (code) {
-    'CNY' => 'yuan',
-    'PKR' => 'rupees',
-    'USD' => 'dollars',
-    _ => code,
-  };
-  return upper ? name[0].toUpperCase() + name.substring(1) : name;
-}
 
 class WealthScreen extends ConsumerStatefulWidget {
   const WealthScreen({super.key});
@@ -61,30 +52,39 @@ class _WealthScreenState extends ConsumerState<WealthScreen> {
     final canShowTotal = summary?.total?.currency == currency;
     final total = canShowTotal ? summary?.total : null;
 
-    return Scaffold(
+    final accountList = accounts != null && summary != null && currency != null
+        ? content(accounts, summary, currency, total)
+        : null;
+
+    return AddEntryScaffold(
       appBar: PageHeader(
         title: currency == null
             ? const SizedBox.shrink()
             : Text(
                 combined
-                    ? 'Everything you have, in ${_currencyName(currency)}'
+                    ? 'Everything you have, in ${currencyName(currency, lowercase: true)}'
                     : 'Everything you have',
                 style: muted,
               ),
       ),
-      floatingActionButton: AddEntryButton(
-        onPressed: () => context.push('/entry?kind=transfer'),
-      ),
-      body: SafeArea(
-        top: false,
-        child: accounts == null || summary == null || currency == null
-            ? Center(
-                child: main.hasError || worth.hasError || balances.hasError
-                    ? const Text('Could not load your accounts.')
-                    : const SizedBox.shrink(),
-              )
-            : content(accounts, summary, currency, total),
-      ),
+      onAdd: () => context.push('/entry?kind=transfer'),
+      slivers: [?accountList],
+      fillRemaining: accountList == null
+          ? Center(
+              child: main.hasError || worth.hasError || balances.hasError
+                  ? const Text('Could not load your accounts.')
+                  : const SizedBox.shrink(),
+            )
+          : Padding(
+              padding: const EdgeInsets.fromLTRB(18, 10, 18, 12),
+              child: Align(
+                alignment: Alignment.bottomLeft,
+                child: Text(
+                  'Rates by ExchangeRate-API',
+                  style: text.bodySmall!.copyWith(color: colors.muted),
+                ),
+              ),
+            ),
     );
   }
 
@@ -103,136 +103,117 @@ class _WealthScreenState extends ConsumerState<WealthScreen> {
       });
     final archived = accounts.where((item) => item.account.archived).toList();
 
-    return CustomScrollView(
-      slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(18, 0, 18, 4),
-          sliver: SliverList.list(
-            children: [
-              if (combined) ...[
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: AmountText(
-                      total ?? subtotal,
-                      key: const Key('wealth-total'),
-                      size: 44,
-                      showDecimals: false,
-                    ),
-                  ),
+    return SliverPadding(
+      padding: const EdgeInsets.fromLTRB(18, 0, 18, 4),
+      sliver: SliverList.list(
+        children: [
+          if (combined) ...[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: AmountText(
+                  total ?? subtotal,
+                  key: const Key('wealth-total'),
+                  size: 44,
+                  showDecimals: false,
                 ),
-                if (worth.ratesMissing)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 5),
-                    child: Text(
-                      "Exchange rates aren't available yet. Connect to the internet to see your full total.",
-                      style: muted,
-                    ),
-                  )
-                else if (worth.ratesStale && worth.snapshotDay != null)
-                  Text(
-                    'Rates from ${DateFormat('d MMM y').format(DateTime.parse(worth.snapshotDay!))}',
-                    style: muted,
-                  ),
-              ] else
-                for (final code in currencies)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _currencyName(code, upper: true),
-                          style: text.titleSmall!.copyWith(
-                            color: currencyColor(colors, code),
-                          ),
-                        ),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: AmountText(
-                              worth.byCurrency[code]!,
-                              key: ValueKey('wealth-total-$code'),
-                              size: 32,
-                              showDecimals: false,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              const SizedBox(height: 16),
-              toggle(),
-              if (combined && total != null) ...[
-                const SizedBox(height: 14),
-                shareBar(currencies, worth.convertedByCurrency),
-              ],
-              for (final code in currencies)
-                currencyGroup(
-                  code,
-                  worth.byCurrency[code]!,
-                  combined && code != main
-                      ? worth.convertedByCurrency[code]
-                      : null,
-                  accounts.where(
-                    (item) =>
-                        item.account.currency == code && !item.account.archived,
-                  ),
-                ),
-              row(
-                Row(
-                  children: [
-                    PhosphorIcon(
-                      PhosphorIconsRegular.plus,
-                      size: 18,
-                      color: colors.muted,
-                    ),
-                    const SizedBox(width: 9),
-                    Text('Add account', style: muted),
-                  ],
-                ),
-                onTap: () => AccountEditSheet.show(context),
-              ),
-              if (archived.isNotEmpty) ...[
-                row(
-                  Text('Archived', style: muted),
-                  onTap: () => setState(() => archivedOpen = !archivedOpen),
-                  trailing: PhosphorIcon(
-                    archivedOpen
-                        ? PhosphorIconsRegular.caretDown
-                        : PhosphorIconsRegular.caretRight,
-                    size: 14,
-                    color: colors.muted,
-                  ),
-                ),
-                if (archivedOpen) ...[
-                  for (final item in archived) accountRow(item, archived: true),
-                  if (archiveError != null)
-                    Text(
-                      archiveError!,
-                      style: muted.copyWith(color: colors.warning),
-                    ),
-                ],
-              ],
-            ],
-          ),
-        ),
-        SliverFillRemaining(
-          hasScrollBody: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 10, 18, 12),
-            child: Align(
-              alignment: Alignment.bottomLeft,
-              child: Text(
-                'Rates by ExchangeRate-API',
-                style: text.bodySmall!.copyWith(color: colors.muted),
               ),
             ),
+            if (worth.ratesMissing)
+              Padding(
+                padding: const EdgeInsets.only(top: 5),
+                child: Text(
+                  "Exchange rates aren't available yet. Connect to the internet to see your full total.",
+                  style: muted,
+                ),
+              )
+            else if (worth.ratesStale && worth.snapshotDay != null)
+              Text(
+                'Rates from ${DateFormat('d MMM y').format(DateTime.parse(worth.snapshotDay!))}',
+                style: muted,
+              ),
+          ] else
+            for (final code in currencies)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      currencyName(code),
+                      style: text.titleSmall!.copyWith(
+                        color: currencyColor(colors, code),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: AmountText(
+                          worth.byCurrency[code]!,
+                          key: ValueKey('wealth-total-$code'),
+                          size: 32,
+                          showDecimals: false,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          const SizedBox(height: 16),
+          toggle(),
+          if (combined && total != null) ...[
+            const SizedBox(height: 14),
+            shareBar(currencies, worth.convertedByCurrency),
+          ],
+          for (final code in currencies)
+            currencyGroup(
+              code,
+              worth.byCurrency[code]!,
+              combined && code != main ? worth.convertedByCurrency[code] : null,
+              accounts.where(
+                (item) =>
+                    item.account.currency == code && !item.account.archived,
+              ),
+            ),
+          row(
+            Row(
+              children: [
+                PhosphorIcon(
+                  PhosphorIconsRegular.plus,
+                  size: 18,
+                  color: colors.muted,
+                ),
+                const SizedBox(width: 9),
+                Text('Add account', style: muted),
+              ],
+            ),
+            onTap: () => AccountEditSheet.show(context),
           ),
-        ),
-      ],
+          if (archived.isNotEmpty) ...[
+            row(
+              Text('Archived', style: muted),
+              onTap: () => setState(() => archivedOpen = !archivedOpen),
+              trailing: PhosphorIcon(
+                archivedOpen
+                    ? PhosphorIconsRegular.caretDown
+                    : PhosphorIconsRegular.caretRight,
+                size: 14,
+                color: colors.muted,
+              ),
+            ),
+            if (archivedOpen) ...[
+              for (final item in archived) accountRow(item, archived: true),
+              if (archiveError != null)
+                Text(
+                  archiveError!,
+                  style: muted.copyWith(color: colors.warning),
+                ),
+            ],
+          ],
+        ],
+      ),
     );
   }
 
@@ -288,7 +269,7 @@ class _WealthScreenState extends ConsumerState<WealthScreen> {
           Expanded(
             flex: max(1, (entry.value * BigInt.from(10000) ~/ sum).toInt()),
             child: Semantics(
-              label: _currencyName(entry.key, upper: true),
+              label: currencyName(entry.key),
               child: Container(
                 height: 8,
                 decoration: BoxDecoration(
@@ -309,7 +290,7 @@ class _WealthScreenState extends ConsumerState<WealthScreen> {
           children: [
             Expanded(
               child: Text(
-                _currencyName(code, upper: true),
+                currencyName(code),
                 style: text.titleSmall!.copyWith(
                   color: currencyColor(colors, code),
                 ),

@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../app/providers.dart';
+import '../../core/money/currency.dart';
 import '../../data/db/app_database.dart';
 import '../../ui/theme/app_colors.dart';
 import '../../ui/widgets/page_header.dart';
@@ -89,8 +90,10 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                   child: Padding(
                     padding: const EdgeInsets.only(top: 12),
                     child: Text(
-                      entry.key,
-                      style: TextStyle(color: colors.muted),
+                      currencyName(entry.key),
+                      style: theme.textTheme.titleSmall!.copyWith(
+                        color: currencyColor(colors, entry.key),
+                      ),
                     ),
                   ),
                 ),

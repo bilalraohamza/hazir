@@ -11,11 +11,16 @@ class PlaceholderTab extends StatelessWidget {
   final bool showAdd;
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: PageHeader(title: Text(title)),
-    body: const Center(child: Text('Coming in the next update')),
-    floatingActionButton: showAdd
-        ? AddEntryButton(onPressed: () => context.push('/entry?kind=expense'))
-        : null,
-  );
+  Widget build(BuildContext context) {
+    final header = PageHeader(title: Text(title));
+    const content = Center(child: Text('Coming in the next update'));
+    if (showAdd) {
+      return AddEntryScaffold(
+        appBar: header,
+        onAdd: () => context.push('/entry?kind=expense'),
+        fillRemaining: content,
+      );
+    }
+    return Scaffold(appBar: header, body: content);
+  }
 }
