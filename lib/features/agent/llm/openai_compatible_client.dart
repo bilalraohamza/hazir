@@ -220,11 +220,14 @@ LlmResponse _parseReply(Object? body) {
               'id': final String id,
               'function': {
                 'name': final String name,
-                'arguments': final String raw,
+                'arguments': final arguments,
               },
             }
             when id.isNotEmpty && name.isNotEmpty) {
-          final decoded = _decode(raw);
+          final raw = arguments is Map
+              ? jsonEncode(arguments)
+              : arguments.toString();
+          final decoded = arguments is String ? _decode(arguments) : arguments;
           calls.add(
             ToolCall(
               id: id,

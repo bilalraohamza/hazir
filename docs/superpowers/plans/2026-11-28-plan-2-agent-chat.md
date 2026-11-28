@@ -100,15 +100,21 @@ test/agent/eval/messages.json          evaluation cases
 
 ### Task 3: Chat storage (schema v2)
 
-**Files:** `lib/data/db/tables.dart`, `app_database.dart`, `lib/features/agent/chat/chat_repository.dart`, `test/agent/chat/`
+**Files:** `drift_schemas/`, `lib/data/db/tables.dart`, `lib/data/db/app_database.dart` and its generated code, `lib/features/agent/chat/chat_repository.dart`, and `test/agent/chat/`.
 
 **Interfaces:**
-- Tables:
-  - `ChatMessages`: id, role (`user` | `assistant`), text, createdAt.
-  - `ChatActions`: id, messageId (assistant message), kind (`saved` | `proposed` | `answer` | `error`), toolName, argumentsJson, status (`saved`, `undone`, `pending`, `confirmed`, `cancelled`, `failed`), transactionId (nullable), resultJson (nullable), createdAt.
-- `schemaVersion => 2` with a migration that only creates the two tables; existing data untouched. Add a migration test that opens a v1 database file created by the plan 1 schema and upgrades it.
-- `class ChatRepository { Stream<List<ChatItem>> watch({int limit = 200}); Future<int> addUser(String text); Future<int> addAssistant(String text); Future<int> addAction(...); Future<void> setActionStatus(int id, String status, {int? transactionId, String? resultJson}); Future<List<ChatMessageRow>> lastMessages(int n); }` where `ChatItem` is a message with its actions.
-- [ ] Steps: failing tests (insert, watch order, status update, last n, migration from v1), implement, pass, commit `feat: chat storage`.
+- Before changing the database, dump and commit the v1 schema and generate the v1 migration test fixture.
+- `ChatMessages` has `id`, `role` (`user` or `assistant`), `text`, nullable integer `turnId`, and `createdAt`. User messages have a null `turnId`. Assistant messages reference the user message that started the turn.
+- `ChatActions` has `id`, `turnId` referencing the user message, `kind` (`saved`, `proposed`, or `error`), nullable `toolName`, nullable `argumentsJson`, `status` (`saved`, `undone`, `pending`, `confirmed`, `cancelled`, or `failed`), nullable `transactionId`, nullable `resultJson`, and `createdAt`. The transaction ID has no foreign key so actions survive deletion of their entries.
+- For proposals, `argumentsJson` holds the normalized preview for Confirm. For errors, `resultJson` holds `{"kind": "<LlmErrorKind name>"}` or a tool error code. Answers are assistant text.
+- `schemaVersion => 2`. The migration only creates the two chat tables. Verify that a populated v1 database file created from the exported schema upgrades without changing its ledger rows.
+- `class ChatTurn { final ChatMessage user; final List<ChatAction> actions; final List<ChatMessage> replies; }`. Actions and replies are ordered by `createdAt` then `id`.
+- `Stream<List<ChatTurn>> watchTurns({int limit = 100})` returns the most recent turns with the newest last.
+- `Future<int> addUser(String text)`, `Future<int> addAssistant(int turnId, String text)`, and `Future<int> addAction({required int turnId, required String kind, required String status, String? toolName, String? argumentsJson, int? transactionId, String? resultJson})`.
+- `Future<void> setActionStatus(int id, String status, {int? transactionId, String? resultJson})`, `Future<ChatAction?> action(int id)`, and `Future<List<ChatAction>> actionsForTurn(int turnId)`.
+- `Future<List<ChatMessage>> historyBefore(int turnId, int n)` returns the last `n` messages of either role with IDs below `turnId`, oldest first. Task 7 attaches the saved-action lines.
+- Unknown role, kind, or status strings throw `ArgumentError`.
+- [x] Steps. Write failing tests for inserts, turn grouping and order, an error before any reply, action updates, history cutoff, the turn limit, validation, and the v1 file migration. Implement, pass the full suite and analyzer, then commit `feat: chat storage`.
 
 ### Task 4: Tool framework and read tools
 

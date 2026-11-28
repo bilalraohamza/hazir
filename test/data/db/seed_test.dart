@@ -81,6 +81,9 @@ void main() {
     () async {
       final db = AppDatabase(NativeDatabase.memory());
       addTearDown(db.close);
+      final schemaBefore = await db
+          .customSelect('PRAGMA user_version')
+          .getSingle();
       await db.seedIfEmpty();
       final others = db.select(db.categories)
         ..where((row) => row.name.equals('Other'));
@@ -111,7 +114,13 @@ void main() {
         first.singleWhere((row) => row.id == renamed).iconKey,
         'dotsThree',
       );
-      expect(db.schemaVersion, 1);
+      final schemaAfter = await db
+          .customSelect('PRAGMA user_version')
+          .getSingle();
+      expect(
+        schemaAfter.read<int>('user_version'),
+        schemaBefore.read<int>('user_version'),
+      );
     },
   );
 }

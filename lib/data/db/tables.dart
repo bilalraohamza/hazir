@@ -72,3 +72,69 @@ class Settings extends Table {
   @override
   Set<Column> get primaryKey => {key};
 }
+
+class ChatValueConverter extends TypeConverter<String, String> {
+  const ChatValueConverter(this.field, this.allowed);
+
+  final String field;
+  final Set<String> allowed;
+
+  @override
+  String toSql(String value) {
+    if (!allowed.contains(value)) {
+      throw ArgumentError.value(value, field, 'Unknown chat $field');
+    }
+    return value;
+  }
+
+  @override
+  String fromSql(String value) => toSql(value);
+}
+
+class ChatMessages extends Table {
+  static const roles = ChatValueConverter('role', {'user', 'assistant'});
+
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get role => text().map(ChatMessages.roles)();
+  TextColumn get messageText => text().named('text')();
+  IntColumn get turnId => integer().nullable().references(ChatMessages, #id)();
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  List<String> get customConstraints => [
+    "CHECK ((role = 'user' AND turn_id IS NULL) OR "
+        "(role = 'assistant' AND turn_id IS NOT NULL))",
+  ];
+}
+
+class ChatActions extends Table {
+  static const kinds = ChatValueConverter('kind', {
+    'saved',
+    'proposed',
+    'error',
+  });
+  static const statuses = ChatValueConverter('status', {
+    'saved',
+    'undone',
+    'pending',
+    'confirmed',
+    'cancelled',
+    'failed',
+  });
+
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get turnId => integer().references(ChatMessages, #id)();
+  TextColumn get kind => text().map(ChatActions.kinds)();
+  TextColumn get toolName => text().nullable()();
+  TextColumn get argumentsJson => text().nullable()();
+  TextColumn get status => text().map(ChatActions.statuses)();
+  IntColumn get transactionId => integer().nullable()();
+  TextColumn get resultJson => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  List<String> get customConstraints => [
+    "CHECK (kind IN ('saved', 'proposed', 'error'))",
+    "CHECK (status IN ('saved', 'undone', 'pending', 'confirmed', 'cancelled', 'failed'))",
+  ];
+}

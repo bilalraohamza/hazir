@@ -207,6 +207,51 @@ void main() {
   );
 
   test(
+    'accepts object and string arguments together and keeps unsupported values',
+    () async {
+      adapter.body = {
+        'choices': [
+          {
+            'message': {
+              'tool_calls': [
+                {
+                  'id': 'a',
+                  'function': {
+                    'name': 'object',
+                    'arguments': {'amount': '28.00'},
+                  },
+                },
+                {
+                  'id': 'b',
+                  'function': {
+                    'name': 'string',
+                    'arguments': '{"amount":"30.00"}',
+                  },
+                },
+                {
+                  'id': 'c',
+                  'function': {'name': 'number', 'arguments': 42},
+                },
+              ],
+            },
+          },
+        ],
+      };
+      final calls = (await complete()).toolCalls;
+      expect(calls.map((call) => call.rawArguments), [
+        '{"amount":"28.00"}',
+        '{"amount":"30.00"}',
+        '42',
+      ]);
+      expect(calls.map((call) => call.arguments), [
+        {'amount': '28.00'},
+        {'amount': '30.00'},
+        <String, Object?>{},
+      ]);
+    },
+  );
+
+  test(
     'text-only requests omit tool fields and empty responses fail',
     () async {
       await complete();
