@@ -135,4 +135,28 @@ void main() {
       }
     },
   );
+
+  testWidgets(
+    'dark theme applies immediately and survives rebuilding the app',
+    (tester) async {
+      await start(tester);
+      await tester.tap(find.byTooltip('Settings'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Dark'));
+      await tester.pumpAndSettle();
+      expect(
+        Theme.of(tester.element(find.byType(SettingsScreen)))
+            .extension<AppColors>(),
+        AppColors.dark,
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      await start(tester);
+      expect(
+        Theme.of(tester.element(find.byType(WealthScreen)))
+            .extension<AppColors>(),
+        AppColors.dark,
+      );
+    },
+  );
 }

@@ -1,3 +1,4 @@
+import 'package:material_ui/material_ui.dart' show ThemeMode;
 import 'package:drift_flutter/drift_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -41,4 +42,17 @@ final mainCurrencyProvider = StreamProvider<String>((ref) {
   return (db.select(db.settings)..where((s) => s.key.equals('mainCurrency')))
       .watchSingle()
       .map((setting) => setting.value);
+});
+
+final themeModeProvider = StreamProvider<ThemeMode>((ref) {
+  final db = ref.watch(databaseProvider);
+  return (db.select(
+    db.settings,
+  )..where((row) => row.key.equals('themeMode'))).watchSingleOrNull().map(
+    (row) => switch (row?.value) {
+      'light' => ThemeMode.light,
+      'dark' => ThemeMode.dark,
+      _ => ThemeMode.system,
+    },
+  );
 });

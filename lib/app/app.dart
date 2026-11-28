@@ -54,6 +54,7 @@ class _BudgetAppState extends ConsumerState<BudgetApp>
       title: 'Hazir',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(Brightness.light),
+      themeMode: ref.watch(themeModeProvider).value ?? ThemeMode.system,
       darkTheme: buildTheme(Brightness.dark),
       routerConfig: _router,
       builder: (context, child) => FutureBuilder<void>(

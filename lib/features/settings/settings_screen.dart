@@ -12,6 +12,8 @@ import '../../ui/widgets/page_header.dart';
 import '../ledger/ledger_errors.dart';
 import '../categories/category_edit_sheet.dart';
 
+import 'theme_control.dart';
+
 const _currencyNames = {'CNY': 'Yuan', 'PKR': 'Rupees', 'USD': 'Dollars'};
 
 final _categoriesProvider = StreamProvider.autoDispose<List<Category>>((ref) {
@@ -137,6 +139,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 6, 18, 20),
           children: [
+            row(
+              title: Text('Theme', style: muted),
+              trailing: const ThemeControl(),
+            ),
             if (main.value case final currency?)
               row(
                 title: Text('Main currency', style: muted),
