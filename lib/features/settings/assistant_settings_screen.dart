@@ -8,6 +8,9 @@ import '../../ui/theme/app_colors.dart';
 import '../../ui/widgets/money_input.dart';
 import '../../ui/widgets/amount_text.dart';
 import '../../ui/widgets/page_header.dart';
+import '../agent/llm/llm_client.dart';
+import '../agent/llm/llm_errors.dart';
+import '../agent/llm/openai_compatible_client.dart';
 import '../agent/settings/agent_settings.dart';
 
 final _keyLabelProvider = FutureProvider.autoDispose
@@ -30,6 +33,36 @@ class AssistantSettingsScreen extends ConsumerStatefulWidget {
 class _AssistantSettingsScreenState
     extends ConsumerState<AssistantSettingsScreen> {
   String? _error;
+  bool _testing = false;
+  String? _testFeedback;
+  AgentSettings? _testedSettings;
+
+  Future<void> _testConnection(AgentSettings settings) async {
+    if (_testing) return;
+    setState(() {
+      _testing = true;
+      _testFeedback = null;
+    });
+    String feedback;
+    try {
+      final client = ref.read(llmClientProvider);
+      await client.complete(
+        messages: const [UserMessage('Reply with OK.')],
+        tools: const [],
+      );
+      feedback = 'Connected to ${settings.model}';
+    } on LlmException catch (error) {
+      feedback = llmErrorText(error.kind);
+    } on Object {
+      feedback = llmErrorText(LlmErrorKind.badResponse);
+    }
+    if (!mounted) return;
+    setState(() {
+      _testFeedback = feedback;
+      _testedSettings = settings;
+      _testing = false;
+    });
+  }
 
   Future<void> _pickProvider(AgentSettings settings) async {
     final repository = ref.read(agentSettingsRepositoryProvider);
@@ -55,7 +88,7 @@ class _AssistantSettingsScreenState
     if (provider == null || provider == settings.provider || !mounted) return;
     setState(() => _error = null);
     try {
-      await repository.save(settings.copyWith(provider: provider));
+      await repository.selectProvider(provider);
     } on Exception {
       if (mounted) setState(() => _error = 'Could not change the provider.');
     }
@@ -77,7 +110,11 @@ class _AssistantSettingsScreenState
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 6, 18, 20),
           children: [
-            if (settings != null) ..._rows(settings),
+            if (settings != null)
+              IgnorePointer(
+                ignoring: _testing,
+                child: Column(children: _rows(settings)),
+              ),
             if (_error != null || value.hasError)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -88,6 +125,28 @@ class _AssistantSettingsScreenState
                   ),
                 ),
               ),
+            if (settings != null) ...[
+              const SizedBox(height: 16),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: colors.brass,
+                  foregroundColor: colors.onBrass,
+                ),
+                onPressed: _testing ? null : () => _testConnection(settings),
+                child: Text(_testing ? 'Testing…' : 'Test connection'),
+              ),
+              if (_testFeedback case final message?
+                  when identical(settings, _testedSettings))
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    message,
+                    style: theme.textTheme.bodyMedium!.copyWith(
+                      color: colors.muted,
+                    ),
+                  ),
+                ),
+            ],
           ],
         ),
       ),
@@ -147,8 +206,7 @@ class _AssistantSettingsScreenState
                   inputKey: const Key('assistant-base-url'),
                   initial: settings.baseUrl,
                   keyboardType: TextInputType.url,
-                  save: (text, _) =>
-                      repository.save(settings.copyWith(baseUrl: text)),
+                  save: (text, _) => repository.saveCustomBaseUrl(text),
                 ),
               ),
       ),
@@ -164,9 +222,8 @@ class _AssistantSettingsScreenState
             inputKey: const Key('assistant-threshold'),
             initial: formatMoney(threshold, withSymbol: false),
             currency: threshold.currency,
-            save: (text, code) => repository.save(
-              settings.copyWith(largeAmountThreshold: Money.parse(text, code!)),
-            ),
+            save: (text, code) =>
+                repository.saveLargeAmountThreshold(Money.parse(text, code!)),
           ),
         ),
       ),
@@ -415,7 +472,7 @@ class _AssistantEditorState extends State<_AssistantEditor> {
                     final message = switch (widget.title) {
                       'Base URL' => 'Enter an HTTPS URL.',
                       'API key' => 'Enter an API key.',
-                      'Model' => 'Enter a model.',
+                      'Model' => 'Enter a model name.',
                       _ => 'Enter an amount.',
                     };
                     throw FormatException(message);

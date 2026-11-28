@@ -134,8 +134,10 @@ class AgentSettingsRepository {
     }
   }
 
-  Stream<AgentSettings> watch() => _query().watch().asyncMap((rows) async {
-    final values = _values(rows);
+  AgentSettings _settings(
+    Map<String, String> values, {
+    required bool hasApiKey,
+  }) {
     final provider = _provider(values);
     return AgentSettings(
       provider: provider,
@@ -143,57 +145,99 @@ class AgentSettingsRepository {
           ? values[_customUrlKey] ?? ''
           : provider.presetBaseUrl,
       model: values[_modelKey] ?? provider.presetModel,
-      hasApiKey: (await apiKey(provider))?.isNotEmpty ?? false,
+      hasApiKey: hasApiKey,
       largeAmountThreshold: _threshold(values[_thresholdKey]),
     );
+  }
+
+  Stream<AgentSettings> watch() => _query().watch().asyncMap((rows) async {
+    final values = _values(rows);
+    final key = await apiKey(_provider(values));
+    return _settings(values, hasApiKey: key?.isNotEmpty ?? false);
   });
 
-  Future<void> save(AgentSettings settings) => _db.transaction(() async {
-    final values = _values(await _query().get());
-    final provider = settings.provider;
-    final switched = provider != _provider(values);
-    final threshold = settings.largeAmountThreshold;
-    currencyOf(threshold.currency);
-    if (threshold.minor < 0) {
-      throw const FormatException('Enter a threshold of zero or more.');
+  // Read the host and key inside the same transaction as configuration changes.
+  Future<({AgentSettings settings, String? key})> readConnection() =>
+      _db.transaction(() async {
+        final values = _values(await _query().get());
+        final key = await apiKey(_provider(values));
+        return (
+          settings: _settings(values, hasApiKey: key?.isNotEmpty ?? false),
+          key: key,
+        );
+      });
+
+  Future<void> save(AgentSettings settings) async {
+    if (settings.model.trim().isEmpty) {
+      throw const FormatException('Enter a model name.');
     }
-    var baseUrl = provider.presetBaseUrl;
-    var model = switched ? provider.presetModel : settings.model.trim();
-    if (provider == AgentProvider.custom) {
-      final previous = values[_customUrlKey] ?? '';
-      baseUrl = switched ? previous : settings.baseUrl.trim();
-      model = switched ? values[_customModelKey] ?? '' : model;
-      if (baseUrl.isNotEmpty || previous.isNotEmpty) {
-        final url = Uri.tryParse(baseUrl);
-        if (url == null ||
-            url.scheme != 'https' ||
-            url.host.isEmpty ||
-            url.userInfo.isNotEmpty) {
-          throw const FormatException(
-            'Enter an HTTPS URL without credentials.',
-          );
-        }
-        if (Uri.tryParse(previous)?.host != url.host) {
-          // Clear before publishing the new host so the old key cannot be reused.
-          await _keyStore.delete(_keyName(provider));
-        }
-      }
+    await _update((_) => settings);
+  }
+
+  Future<void> selectProvider(AgentProvider provider) =>
+      _update((current) => current.copyWith(provider: provider));
+
+  Future<void> saveCustomBaseUrl(String baseUrl) => _update((current) {
+    if (current.provider != AgentProvider.custom) {
+      throw const FormatException('Select Custom to edit the base URL.');
     }
-    final updates = {
-      _providerKey: provider.name,
-      _urlKey: baseUrl,
-      _modelKey: model,
-      _thresholdKey: '${threshold.minor}:${threshold.currency}',
-      if (provider == AgentProvider.custom) _customUrlKey: baseUrl,
-      if (provider == AgentProvider.custom) _customModelKey: model,
-    };
-    await _db.batch((batch) {
-      batch.insertAllOnConflictUpdate(_db.settings, [
-        for (final entry in updates.entries)
-          SettingsCompanion.insert(key: entry.key, value: entry.value),
-      ]);
-    });
+    return current.copyWith(baseUrl: baseUrl);
   });
+
+  Future<void> saveLargeAmountThreshold(Money threshold) =>
+      _update((current) => current.copyWith(largeAmountThreshold: threshold));
+
+  Future<void> _update(AgentSettings Function(AgentSettings) change) =>
+      _db.transaction(() async {
+        final values = _values(await _query().get());
+        final settings = change(_settings(values, hasApiKey: false));
+        final provider = settings.provider;
+        final switched = provider != _provider(values);
+        final threshold = settings.largeAmountThreshold;
+        currencyOf(threshold.currency);
+        if (threshold.minor < 0) {
+          throw const FormatException('Enter a threshold of zero or more.');
+        }
+        var baseUrl = provider.presetBaseUrl;
+        var model = switched ? provider.presetModel : settings.model.trim();
+        if (provider == AgentProvider.custom) {
+          final previous = values[_customUrlKey] ?? '';
+          baseUrl = switched ? previous : settings.baseUrl.trim();
+          model = switched ? values[_customModelKey] ?? '' : model;
+          if (baseUrl.isNotEmpty || previous.isNotEmpty) {
+            final url = Uri.tryParse(baseUrl);
+            if (url == null ||
+                url.scheme != 'https' ||
+                url.host.isEmpty ||
+                url.userInfo.isNotEmpty) {
+              throw const FormatException(
+                'Enter an HTTPS URL without credentials.',
+              );
+            }
+            final previousHost = Uri.tryParse(previous)?.host;
+            if (previousHost != null &&
+                previousHost.isNotEmpty &&
+                previousHost != url.host) {
+              // Clear before publishing the new host so the old key cannot be reused.
+              await _keyStore.delete(_keyName(provider));
+            }
+          }
+        }
+        final updates = {
+          _providerKey: provider.name,
+          _urlKey: baseUrl,
+          _modelKey: model,
+          _thresholdKey: '${threshold.minor}:${threshold.currency}',
+          if (provider == AgentProvider.custom) _customUrlKey: baseUrl,
+          if (provider == AgentProvider.custom) _customModelKey: model,
+        };
+        await _db.batch((batch) {
+          batch.insertAllOnConflictUpdate(_db.settings, [
+            for (final entry in updates.entries)
+              SettingsCompanion.insert(key: entry.key, value: entry.value),
+          ]);
+        });
+      });
 
   String _keyName(AgentProvider provider) => 'apiKey.${provider.name}';
 

@@ -1,8 +1,12 @@
+import 'dart:async';
+
+import 'package:budget_app/features/agent/llm/llm_client.dart';
 import 'package:budget_app/features/settings/assistant_settings_screen.dart';
 import 'package:budget_app/ui/theme/app_colors.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../agent/fakes.dart';
 import '../../agent/settings/fake_agent_key_store.dart';
 import '../../app/shell_fixture.dart';
 
@@ -22,17 +26,68 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Future<void> openAssistant(WidgetTester tester) async {
+  Future<void> openAssistant(WidgetTester tester, {LlmClient? client}) async {
     await tester.binding.setSurfaceSize(const Size(400, 740));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(fixture.build(agentKeyStore: keys));
+    await tester.pumpWidget(
+      fixture.build(agentKeyStore: keys, llmClient: client),
+    );
     await tester.pumpAndSettle();
     await tap(tester, find.byTooltip('Settings'));
     expect(find.text('Assistant'), findsOneWidget);
     expect(find.text('Not set up'), findsOneWidget);
     await tap(tester, find.text('AI assistant'));
-    expect(find.text('Test connection'), findsNothing);
+    expect(find.text('Test connection'), findsOneWidget);
   }
+
+  testWidgets(
+    'Test connection disables itself while running, then reports success and a friendly failure',
+    (tester) async {
+      final pending = Completer<LlmResponse>();
+      final fake = FakeLlmClient([
+        () => pending.future,
+        () => throw const LlmException(
+          LlmErrorKind.quotaExceeded,
+          'provider detail',
+        ),
+      ]);
+      await openAssistant(tester, client: fake);
+      await tap(tester, find.text('Test connection'));
+      expect(
+        tester
+            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Testing…'))
+            .onPressed,
+        isNull,
+      );
+      expect(
+        (fake.requests.single.messages.single as UserMessage).text,
+        'Reply with OK.',
+      );
+      expect(fake.requests.single.tools, isEmpty);
+      pending.complete(const LlmResponse(text: 'OK', toolCalls: []));
+      await tester.pumpAndSettle();
+      expect(find.text('Connected to glm-4.7-flash'), findsOneWidget);
+
+      await tap(tester, find.text('Test connection'));
+      expect(
+        find.text(
+          "Your AI account has run out of free quota. Check your provider's console.",
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('provider detail'), findsNothing);
+    },
+  );
+
+  testWidgets('empty model stays in the editor with the inline error', (
+    tester,
+  ) async {
+    await openAssistant(tester);
+    await tap(tester, find.text('Model'));
+    await tester.enterText(find.byKey(const Key('assistant-model')), '');
+    await tap(tester, find.text('Save'));
+    expect(find.text('Enter a model name.'), findsOneWidget);
+  });
 
   testWidgets('API key is masked after Save and Remove clears it', (
     tester,

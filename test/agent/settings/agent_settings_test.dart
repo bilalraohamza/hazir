@@ -136,12 +136,56 @@ void main() {
     },
   );
 
+  test(
+    'the first Custom URL keeps its key and a subsequent host change clears it',
+    () async {
+      await repository.selectProvider(AgentProvider.custom);
+      await repository.setApiKey(AgentProvider.custom, 'example-first-key');
+      final custom = await repository.watch().first;
+      await repository.save(
+        custom.copyWith(
+          baseUrl: 'https://example.invalid/v1',
+          model: 'custom-model',
+        ),
+      );
+      expect(
+        await repository.apiKey(AgentProvider.custom),
+        'example-first-key',
+      );
+      final configured = await repository.watch().first;
+      await repository.save(
+        configured.copyWith(baseUrl: 'https://other.invalid/v1'),
+      );
+      expect(await repository.apiKey(AgentProvider.custom), isNull);
+    },
+  );
+
+  test('save rejects a blank model for every provider', () async {
+    for (final provider in AgentProvider.values) {
+      await repository.selectProvider(provider);
+      final current = await repository.watch().first;
+      await expectLater(
+        repository.save(current.copyWith(model: '  ')),
+        throwsA(
+          isA<FormatException>().having(
+            (error) => error.message,
+            'message',
+            'Enter a model name.',
+          ),
+        ),
+      );
+    }
+  });
+
   test('non-HTTPS Custom URLs are rejected and only a new host clears the Custom key', () async {
     final defaults = await repository.watch().first;
     await repository.save(defaults.copyWith(provider: AgentProvider.custom));
     final custom = await repository.watch().first;
     await repository.save(
-      custom.copyWith(baseUrl: 'https://example.invalid/v1'),
+      custom.copyWith(
+        baseUrl: 'https://example.invalid/v1',
+        model: 'custom-model',
+      ),
     );
     await repository.setApiKey(AgentProvider.custom, 'example-custom-4528');
     await repository.setApiKey(AgentProvider.zhipu, 'example-zhipu-7328');

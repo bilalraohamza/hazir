@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:budget_app/app/app.dart';
 import 'package:budget_app/app/providers.dart';
 import 'package:budget_app/data/db/app_database.dart';
+import 'package:budget_app/features/agent/llm/llm_client.dart';
+import 'package:budget_app/features/agent/llm/openai_compatible_client.dart';
 import 'package:budget_app/features/fx/fx_service.dart';
 import 'package:budget_app/features/agent/settings/agent_settings.dart';
 import 'package:budget_app/features/fx/rates_api.dart';
@@ -37,9 +39,11 @@ class ShellFixture {
   Widget build({
     Widget child = const BudgetApp(),
     AgentKeyStore? agentKeyStore,
+    LlmClient? llmClient,
   }) => ProviderScope(
     overrides: [
       databaseProvider.overrideWithValue(db),
+      if (llmClient != null) llmClientProvider.overrideWithValue(llmClient),
       agentSettingsRepositoryProvider.overrideWithValue(
         AgentSettingsRepository(db, agentKeyStore ?? FakeAgentKeyStore()),
       ),
