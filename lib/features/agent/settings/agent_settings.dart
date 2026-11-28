@@ -156,6 +156,9 @@ class AgentSettingsRepository {
     return _settings(values, hasApiKey: key?.isNotEmpty ?? false);
   });
 
+  Future<Money> readLargeAmountThreshold() async =>
+      _threshold(_values(await _query().get())[_thresholdKey]);
+
   // Read the host and key inside the same transaction as configuration changes.
   Future<({AgentSettings settings, String? key})> readConnection() =>
       _db.transaction(() async {
@@ -184,8 +187,22 @@ class AgentSettingsRepository {
     return current.copyWith(baseUrl: baseUrl);
   });
 
-  Future<void> saveLargeAmountThreshold(Money threshold) =>
-      _update((current) => current.copyWith(largeAmountThreshold: threshold));
+  Future<void> saveLargeAmountThreshold(Money threshold) async {
+    final value = _validatedThresholdValue(threshold);
+    await _db
+        .into(_db.settings)
+        .insertOnConflictUpdate(
+          SettingsCompanion.insert(key: _thresholdKey, value: value),
+        );
+  }
+
+  String _validatedThresholdValue(Money threshold) {
+    currencyOf(threshold.currency);
+    if (threshold.minor < 0) {
+      throw const FormatException('Enter a threshold of zero or more.');
+    }
+    return '${threshold.minor}:${threshold.currency}';
+  }
 
   Future<void> _update(AgentSettings Function(AgentSettings) change) =>
       _db.transaction(() async {
@@ -193,11 +210,9 @@ class AgentSettingsRepository {
         final settings = change(_settings(values, hasApiKey: false));
         final provider = settings.provider;
         final switched = provider != _provider(values);
-        final threshold = settings.largeAmountThreshold;
-        currencyOf(threshold.currency);
-        if (threshold.minor < 0) {
-          throw const FormatException('Enter a threshold of zero or more.');
-        }
+        final thresholdValue = _validatedThresholdValue(
+          settings.largeAmountThreshold,
+        );
         var baseUrl = provider.presetBaseUrl;
         var model = switched ? provider.presetModel : settings.model.trim();
         if (provider == AgentProvider.custom) {
@@ -227,7 +242,7 @@ class AgentSettingsRepository {
           _providerKey: provider.name,
           _urlKey: baseUrl,
           _modelKey: model,
-          _thresholdKey: '${threshold.minor}:${threshold.currency}',
+          _thresholdKey: thresholdValue,
           if (provider == AgentProvider.custom) _customUrlKey: baseUrl,
           if (provider == AgentProvider.custom) _customModelKey: model,
         };

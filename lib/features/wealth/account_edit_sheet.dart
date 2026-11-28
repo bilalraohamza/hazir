@@ -10,6 +10,7 @@ import '../../ui/widgets/amount_text.dart';
 import '../../ui/widgets/money_input.dart';
 import '../../ui/widgets/deletion_feedback.dart';
 import '../ledger/deletion_service.dart';
+import '../ledger/deletion_texts.dart';
 import '../ledger/ledger_errors.dart';
 
 enum _DeleteAccountAction { delete, archive }
@@ -96,7 +97,7 @@ class _AccountEditSheetState extends ConsumerState<AccountEditSheet> {
       if (mounted) Navigator.pop(context);
     } on LedgerException catch (error) {
       final field = switch (error.code) {
-        'duplicate_name' => 'Name',
+        'duplicate_name' || 'empty_name' => 'Name',
         'unknown_currency' => 'Currency',
         'currency_mismatch' => 'Opening balance',
         _ => 'Account',
@@ -182,23 +183,7 @@ class _AccountEditSheetState extends ConsumerState<AccountEditSheet> {
     AccountDeletionDetails details,
   ) {
     final name = details.account.name;
-    final entryCount = details.entryCount;
-    final transfers = details.transferCount;
-    final names = details.counterpartNames;
-    final counterparts = names.length < 2
-        ? names.join()
-        : '${names.take(names.length - 1).join(', ')} and ${names.last}';
-    final countLabel = entryCountLabel(entryCount);
-    final description = StringBuffer('This permanently deletes the account');
-    if (entryCount > 0) description.write(' and its $countLabel');
-    if (transfers > 0) {
-      description.write(
-        ', including $transfers ${transfers == 1 ? 'transfer' : 'transfers'}',
-      );
-      if (counterparts.isNotEmpty) description.write(' with $counterparts');
-    }
-    description.write('.');
-    if (transfers > 0) description.write(' Their balances will change.');
+    final copy = accountDeletionText(details);
     return showModalBottomSheet<_DeleteAccountAction>(
       context: context,
       isScrollControlled: true,
@@ -218,22 +203,15 @@ class _AccountEditSheetState extends ConsumerState<AccountEditSheet> {
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 12),
-              Text(description.toString()),
+              Text(copy.warning),
               const SizedBox(height: 8),
-              Text(
-                "This can't be undone after a few seconds. To keep the history, archive it instead.",
-                style: muted,
-              ),
+              Text(accountDeletionFootnote, style: muted),
               const SizedBox(height: 18),
               FilledButton(
                 style: deleteButtonStyle(),
                 onPressed: () =>
                     Navigator.pop(sheet, _DeleteAccountAction.delete),
-                child: Text(
-                  entryCount == 0
-                      ? 'Delete account'
-                      : 'Delete account and $countLabel',
-                ),
+                child: Text(copy.confirmLabel),
               ),
               OutlinedButton(
                 style: OutlinedButton.styleFrom(

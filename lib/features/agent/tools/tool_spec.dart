@@ -1,3 +1,5 @@
+import '../../ledger/deletion_service.dart';
+
 enum ToolKind { read, write, destructive }
 
 typedef ToolCallback = Future<ToolResult> Function(Map<String, Object?>);
@@ -33,9 +35,10 @@ sealed class ToolResult {
 }
 
 class ToolOk extends ToolResult {
-  const ToolOk(this.data);
+  const ToolOk(this.data, {this.deletionReceipt});
 
   final Map<String, Object?> data;
+  final DeletionReceipt? deletionReceipt;
 
   @override
   Map<String, Object?> toJson() => data;

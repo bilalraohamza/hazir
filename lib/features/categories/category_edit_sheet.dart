@@ -8,6 +8,7 @@ import '../../ui/theme/app_colors.dart';
 import '../../ui/widgets/category_icons.dart';
 import '../../ui/widgets/deletion_feedback.dart';
 import '../ledger/deletion_service.dart';
+import '../ledger/deletion_texts.dart';
 import '../ledger/ledger_errors.dart';
 
 class CategoryEditSheet extends ConsumerStatefulWidget {
@@ -138,14 +139,15 @@ class CategoryEditSheetState extends ConsumerState<CategoryEditSheet> {
   }
 
   Future<bool> confirmEmptyCategory(String name) async {
+    final copy = categoryDeletionText(name, 0);
     return await deleteSheet<bool>(
           (sheet) => [
-            Text('Delete $name?', style: text.titleLarge),
+            Text(copy.warning, style: text.titleLarge),
             const SizedBox(height: 18),
             FilledButton(
               style: deleteButtonStyle(),
               onPressed: () => Navigator.pop(sheet, true),
-              child: const Text('Delete category'),
+              child: Text(copy.confirmLabel),
             ),
             cancel(sheet),
           ],
@@ -181,18 +183,16 @@ class CategoryEditSheetState extends ConsumerState<CategoryEditSheet> {
 
   Future<Category?> chooseDestination(CategoryDeletionDetails details) {
     Category? destination;
-    final count = details.entryCount;
-    final subject = count == 1
-        ? 'uses this category. Choose where it goes'
-        : 'use this category. Choose where they go';
+    final copy = categoryDeletionText(
+      details.category.name,
+      details.entryCount,
+    );
     final muted = text.bodyMedium!.copyWith(color: colors.muted);
     return deleteSheet<Category>(
       (sheet) => [
         Text('Delete ${details.category.name}?', style: text.titleLarge),
         const SizedBox(height: 12),
-        Text(
-          '${entryCountLabel(count)} $subject, so your spending history stays correct.',
-        ),
+        Text(copy.warning),
         const SizedBox(height: 8),
         StatefulBuilder(
           builder: (context, select) => Column(
@@ -243,7 +243,7 @@ class CategoryEditSheetState extends ConsumerState<CategoryEditSheet> {
                 onPressed: destination == null
                     ? null
                     : () => Navigator.pop(sheet, destination),
-                child: Text('Move ${entryCountLabel(count)} and delete'),
+                child: Text(copy.confirmLabel),
               ),
             ],
           ),

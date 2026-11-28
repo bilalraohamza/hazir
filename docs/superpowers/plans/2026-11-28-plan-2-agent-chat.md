@@ -129,7 +129,7 @@ test/agent/eval/messages.json          evaluation cases
 - Argument helpers that return ToolError instead of throwing: `money(args, 'amount', 'currency')`, `intId(args, 'account_id')`, `optionalDate(args, 'at')` (ISO local "2026-11-28T12:41" or "2026-11-28"), `stringList(args, 'assumed')`.
 - Read tools (all return computed values as both formatted strings and minor units):
   - `list_accounts` (id, name, currency, archived), `list_categories` (id, name, kind, archived),
-  - `get_balances` (active account breakdown, totals including archived balances as on Wealth, combined total in main currency or `rates_missing` and the affected currencies),
+  - `get_balances` (active accounts plus archived accounts with nonzero balances, totals matching Wealth, combined total in main currency or `rates_missing` and the affected currencies),
   - `get_spending` (args: period `this_month` | `last_month` | `YYYY-MM`, optional category_id, account_id; returns total and per category with counts and unconverted count),
   - `get_entries` (args: optional category_id, account_id, kind, from, to, text contains in note, limit max 20),
   - `get_exchange_rate` (from, to; returns rate and day, or rates_missing),
@@ -146,8 +146,8 @@ test/agent/eval/messages.json          evaluation cases
 - Account tools: `create_account` (name, currency, opening_amount?), `rename_account`, `archive_account`, `delete_account` (destructive; result includes the counts used in the warning text).
 - Category tools: `create_category` (name, kind, icon_key?; description tells the model to ask Rao first), `rename_category`, `archive_category`, `delete_category` (category_id, move_to_category_id?; destructive).
 - Settings tools: `set_main_currency` (currency), `set_large_amount_threshold` (amount, currency).
-- Each tool has two phases so the save policy can sit between them: `validate(args) -> ToolResult` (no writes, returns a normalized preview: account and category names, Money values, converted main-currency amount or null) and `execute(normalized) -> ToolResult` (performs the write via the existing services, returns transactionId or receipt id). LedgerException codes map to ToolError with the same code.
-- [ ] Steps: failing tests per tool for validate and execute (happy path, each validation error, transfers with received vs rate vs none and rates missing, delete returns a DeletionReceipt usable for undo), implement, pass, commit `feat: agent write tools`.
+- Each tool has two phases so the save policy can sit between them: `validate(args) -> ToolResult` (no writes, returns a normalized preview: account and category names, Money values, `policy_amount` in the threshold currency using the latest rate or null) and `execute(normalized) -> ToolResult` (performs the write via the existing services, returns `transaction_id` or the affected ID, with deletion receipts available to the caller outside model JSON). LedgerException codes map to ToolError with the same code.
+- [x] Steps: failing tests per tool for validate and execute (happy path, each validation error, transfers with received vs rate vs none and rates missing, delete returns a DeletionReceipt usable for undo), implement, pass, commit `feat: agent write tools`.
 
 ### Task 6: Save policy
 

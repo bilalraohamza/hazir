@@ -5,13 +5,13 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../app/providers.dart';
-import '../../data/db/app_database.dart';
 import '../../ui/theme/app_colors.dart';
 import '../../ui/widgets/page_header.dart';
 import '../agent/settings/agent_settings.dart';
 import 'accounts_screen.dart';
 import 'assistant_settings_screen.dart';
 import 'categories_screen.dart';
+import 'main_currency_setting.dart';
 
 import 'theme_control.dart';
 
@@ -78,11 +78,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     setState(() => savingCurrency = true);
     try {
       final db = ref.read(databaseProvider);
-      await db
-          .into(db.settings)
-          .insertOnConflictUpdate(
-            SettingsCompanion.insert(key: 'mainCurrency', value: selection),
-          );
+      await saveMainCurrency(db, selection);
     } finally {
       if (mounted) setState(() => savingCurrency = false);
     }

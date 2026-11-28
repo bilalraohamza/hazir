@@ -15,17 +15,8 @@ class AccountService {
     int openingMinor = 0,
     bool isCredit = false,
   }) async {
-    try {
-      currencyOf(currency);
-    } on ArgumentError {
-      throw const LedgerException(
-        'unknown_currency',
-        'Choose a supported currency.',
-      );
-    }
-    final trimmed = name.trim();
     return _db.transaction(() async {
-      await _checkName(trimmed);
+      final trimmed = await validateNewAccount(name: name, currency: currency);
       final last =
           await (_db.select(_db.accounts)
                 ..orderBy([(a) => OrderingTerm.desc(a.sortOrder)])
@@ -45,10 +36,34 @@ class AccountService {
     });
   }
 
-  Future<void> renameAccount(int id, String name) => _db.transaction(() async {
-    final account = await _account(id);
-    final trimmed = name.trim();
+  Future<String> validateNewAccount({
+    required String name,
+    required String currency,
+  }) async {
+    try {
+      currencyOf(currency);
+    } on ArgumentError {
+      throw const LedgerException(
+        'unknown_currency',
+        'Choose a supported currency.',
+      );
+    }
+    final trimmed = _nonEmptyName(name);
+    await _checkName(trimmed);
+    return trimmed;
+  }
+
+  Future<Account> validateAccount(int id) => _account(id);
+
+  Future<String> validateRename(int id, String name) async {
+    final account = await validateAccount(id);
+    final trimmed = _nonEmptyName(name);
     if (!account.archived) await _checkName(trimmed, except: id);
+    return trimmed;
+  }
+
+  Future<void> renameAccount(int id, String name) => _db.transaction(() async {
+    final trimmed = await validateRename(id, name);
     await _update(id, AccountsCompanion(name: Value(trimmed)));
   });
 
@@ -66,7 +81,7 @@ class AccountService {
   );
 
   Future<void> archiveAccount(int id) => _db.transaction(() async {
-    await _account(id);
+    await validateAccount(id);
     await _update(id, const AccountsCompanion(archived: Value(true)));
   });
 
@@ -117,6 +132,14 @@ class AccountService {
       );
     }
     return account;
+  }
+
+  String _nonEmptyName(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      throw const LedgerException('empty_name', 'Enter an account name.');
+    }
+    return trimmed;
   }
 
   Future<void> _checkName(String name, {int? except}) async {

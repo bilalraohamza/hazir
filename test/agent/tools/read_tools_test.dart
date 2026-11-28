@@ -205,8 +205,10 @@ void main() {
         worth.byCurrency.map((code, amount) => MapEntry(code, json(amount))),
       );
       expect(
-        (result['accounts'] as List).any((a) => (a as Map)['id'] == bank),
-        isFalse,
+        (result['accounts'] as List).singleWhere(
+          (a) => (a as Map)['id'] == bank,
+        ),
+        containsPair('archived', true),
       );
     });
 

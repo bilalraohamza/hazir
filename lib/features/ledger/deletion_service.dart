@@ -128,6 +128,31 @@ class DeletionService {
     );
   });
 
+  Future<Category> validateCategoryMove(
+    Category category,
+    int? moveToCategoryId,
+  ) async {
+    if (moveToCategoryId == null) {
+      throw const LedgerException(
+        'category_has_entries',
+        'Choose where to move this category’s entries.',
+      );
+    }
+    final target = await (_db.select(
+      _db.categories,
+    )..where((row) => row.id.equals(moveToCategoryId))).getSingleOrNull();
+    if (moveToCategoryId == category.id ||
+        target == null ||
+        target.kind != category.kind ||
+        target.archived) {
+      throw const LedgerException(
+        'wrong_category_kind',
+        'Choose another active category of the same type.',
+      );
+    }
+    return target;
+  }
+
   Future<DeletionReceipt> deleteCategory(
     int id, {
     int? moveToCategoryId,
@@ -141,24 +166,7 @@ class DeletionService {
         .map((row) => row.read(idColumn)!)
         .toList();
     if (movedIds.isNotEmpty) {
-      if (moveToCategoryId == null) {
-        throw const LedgerException(
-          'category_has_entries',
-          'Choose where to move this category’s entries.',
-        );
-      }
-      final target = await (_db.select(
-        _db.categories,
-      )..where((row) => row.id.equals(moveToCategoryId))).getSingleOrNull();
-      if (moveToCategoryId == id ||
-          target == null ||
-          target.kind != category.kind ||
-          target.archived) {
-        throw const LedgerException(
-          'wrong_category_kind',
-          'Choose another active category of the same type.',
-        );
-      }
+      await validateCategoryMove(category, moveToCategoryId);
       await (_db.update(_db.transactions)
             ..where((t) => t.categoryId.equals(id)))
           .write(TransactionsCompanion(categoryId: Value(moveToCategoryId)));

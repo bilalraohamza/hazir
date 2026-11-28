@@ -195,7 +195,10 @@ class LedgerService {
     }
   }
 
-  Future<Money> _transferAmount(TransactionDraft draft) async {
+  Future<Money> _transferAmount(
+    TransactionDraft draft, {
+    required bool useLatestRate,
+  }) async {
     if (draft.categoryId != null) {
       throw const LedgerException(
         'wrong_category_kind',
@@ -217,7 +220,11 @@ class LedgerService {
     }
     final rate =
         draft.customRate ??
-        await _fx.rate(draft.amount.currency, to.currency, on: draft.at);
+        await _fx.rate(
+          draft.amount.currency,
+          to.currency,
+          on: useLatestRate ? null : draft.at,
+        );
     if (rate == null) {
       throw const LedgerException(
         'missing_to_amount',
@@ -259,20 +266,26 @@ class LedgerService {
     }
   }
 
+  Future<Money?> validateDraft(
+    TransactionDraft draft, {
+    bool useLatestRate = false,
+  }) async {
+    final account = await _activeAccount(draft.accountId);
+    _validateAmount(draft.amount, account.currency);
+    if (draft.kind == 'transfer') {
+      return _transferAmount(draft, useLatestRate: useLatestRate);
+    }
+    await _validateCategory(draft);
+    return null;
+  }
+
   Future<int> _save(TransactionDraft draft, {int? id}) =>
       _db.transaction(() async {
-        final account = await _activeAccount(draft.accountId);
-        _validateAmount(draft.amount, account.currency);
-        Money? received;
-        if (draft.kind == 'transfer') {
-          received = await _transferAmount(draft);
-        } else {
-          await _validateCategory(draft);
-        }
+        final received = await validateDraft(draft);
         final row = TransactionsCompanion(
           kind: Value(draft.kind),
-          accountId: Value(account.id),
-          currency: Value(account.currency),
+          accountId: Value(draft.accountId),
+          currency: Value(draft.amount.currency),
           amountMinor: Value(draft.amount.minor),
           categoryId: Value(draft.categoryId),
           toAccountId: Value(received == null ? null : draft.toAccountId),

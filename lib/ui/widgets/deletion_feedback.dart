@@ -2,10 +2,8 @@ import 'package:material_ui/material_ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../features/ledger/deletion_service.dart';
+import '../../features/ledger/deletion_texts.dart';
 import '../theme/app_colors.dart';
-
-String entryCountLabel(int count) =>
-    '$count ${count == 1 ? 'entry' : 'entries'}';
 
 ButtonStyle deleteButtonStyle() => FilledButton.styleFrom(
   backgroundColor: AppColors.light.warning,
@@ -21,7 +19,7 @@ Future<bool> confirmEntryDeletion(BuildContext context) async {
           backgroundColor: colors.surface,
           surfaceTintColor: colors.surface,
           shadowColor: colors.onBrass,
-          title: const Text('Delete this entry?'),
+          title: Text(entryDeletionText.warning),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialog, false),
@@ -30,7 +28,7 @@ Future<bool> confirmEntryDeletion(BuildContext context) async {
             FilledButton(
               style: deleteButtonStyle(),
               onPressed: () => Navigator.pop(dialog, true),
-              child: const Text('Delete'),
+              child: Text(entryDeletionText.confirmLabel),
             ),
           ],
         ),

@@ -60,7 +60,7 @@ void registerReadTools(
   );
   register(
     'get_balances',
-    'Show active account balances and Wealth totals. Currency and combined totals include archived accounts, as on Wealth.',
+    'Show Wealth totals and the balances behind them: all active accounts and archived accounts with nonzero balances.',
     tools.balances,
   );
   register(
@@ -184,7 +184,7 @@ class _ReadTools {
         return ToolOk({
           'accounts': [
             for (final item in await ledger.balances())
-              if (!item.account.archived)
+              if (!item.account.archived || item.balance.minor != 0)
                 {..._account(item.account), 'balance': moneyJson(item.balance)},
           ],
           'by_currency': worth.byCurrency.map(
