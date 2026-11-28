@@ -9,7 +9,7 @@ import 'tool_args.dart';
 import 'tool_registry.dart';
 import 'tool_spec.dart';
 
-// Compare JSON values structurally, including nested old/new entry previews.
+// Compare how an action will appear, including nested old/new entry previews.
 bool previewChanged(Map oldPreview, Map newPreview) {
   Map shown(Map preview) {
     final fields = Map.of(preview)
@@ -23,17 +23,19 @@ bool previewChanged(Map oldPreview, Map newPreview) {
     return fields;
   }
 
-  return !_sameValue(shown(oldPreview), shown(newPreview));
+  return !sameJsonValue(shown(oldPreview), shown(newPreview));
 }
 
-bool _sameValue(Object? a, Object? b) {
+bool sameJsonValue(Object? a, Object? b) {
   if (a is Map && b is Map) {
     return a.length == b.length &&
-        a.keys.every((key) => b.containsKey(key) && _sameValue(a[key], b[key]));
+        a.keys.every(
+          (key) => b.containsKey(key) && sameJsonValue(a[key], b[key]),
+        );
   }
   if (a is List && b is List) {
     return a.length == b.length &&
-        a.indexed.every((item) => _sameValue(item.$2, b[item.$1]));
+        a.indexed.every((item) => sameJsonValue(item.$2, b[item.$1]));
   }
   return a == b;
 }

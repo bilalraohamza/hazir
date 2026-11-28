@@ -24,6 +24,14 @@ class ChatRepository {
   final AppDatabase _db;
   final DateTime Function() _clock;
 
+  // Keep a ledger write and its chat action in the same database transaction.
+  Future<T> transaction<T>(Future<T> Function() work) => _db.transaction(work);
+
+  Future<ChatMessage> userMessage(int turnId) =>
+      (_db.select(_db.chatMessages)
+            ..where((row) => row.id.equals(turnId) & row.role.equals('user')))
+          .getSingle();
+
   Stream<List<ChatTurn>> watchTurns({int limit = 100}) {
     RangeError.checkNotNegative(limit, 'limit');
     final messages = _db.chatMessages;
