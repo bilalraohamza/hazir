@@ -226,6 +226,11 @@ void main() {
         findsOneWidget,
       );
       final move = find.widgetWithText(FilledButton, 'Move 1 entry and delete');
+      expect(
+        find.ancestor(of: move, matching: find.byType(BottomSheet)),
+        findsOneWidget,
+      );
+      expect(find.text('Move entries to'), findsOneWidget);
       expect(tester.widget<FilledButton>(move).onPressed, isNull);
       await tap(tester, key('move-category-picker'));
       await tap(tester, find.text('Groceries').last);

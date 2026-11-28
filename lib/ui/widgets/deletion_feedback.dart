@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../features/ledger/deletion_service.dart';
 import '../theme/app_colors.dart';
@@ -52,12 +53,24 @@ void Function(String, DeletionReceipt) deletionUndoFor(BuildContext context) {
     messenger.showSnackBar(
       SnackBar(
         duration: const Duration(seconds: 8),
-        backgroundColor: colors.ink,
+        backgroundColor: colors.surface,
         behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: colors.rule, width: .7),
+        ),
         content: Row(
           children: [
+            PhosphorIcon(
+              PhosphorIconsDuotone.trash,
+              size: 18,
+              color: colors.muted,
+              duotoneSecondaryColor: colors.muted,
+              duotoneSecondaryOpacity: .2,
+            ),
+            const SizedBox(width: 8),
             Expanded(
-              child: Text(message, style: TextStyle(color: colors.ground)),
+              child: Text(message, style: TextStyle(color: colors.ink)),
             ),
             const SizedBox(width: 12),
             FilledButton(
@@ -76,10 +89,10 @@ void Function(String, DeletionReceipt) deletionUndoFor(BuildContext context) {
                   if (messenger.mounted) {
                     messenger.showSnackBar(
                       SnackBar(
-                        backgroundColor: colors.ink,
+                        backgroundColor: colors.surface,
                         content: Text(
                           'Could not undo this deletion.',
-                          style: TextStyle(color: colors.ground),
+                          style: TextStyle(color: colors.ink),
                         ),
                       ),
                     );

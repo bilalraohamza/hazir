@@ -138,29 +138,46 @@ class CategoryEditSheetState extends ConsumerState<CategoryEditSheet> {
   }
 
   Future<bool> confirmEmptyCategory(String name) async {
-    return await showDialog<bool>(
-          context: context,
-          barrierColor: colors.onBrass.withValues(alpha: .5),
-          builder: (dialog) => AlertDialog(
-            backgroundColor: colors.surface,
-            surfaceTintColor: colors.surface,
-            shadowColor: colors.onBrass,
-            title: Text('Delete $name?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialog, false),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                style: deleteButtonStyle(),
-                onPressed: () => Navigator.pop(dialog, true),
-                child: const Text('Delete'),
-              ),
-            ],
-          ),
+    return await deleteSheet<bool>(
+          (sheet) => [
+            Text('Delete $name?', style: text.titleLarge),
+            const SizedBox(height: 18),
+            FilledButton(
+              style: deleteButtonStyle(),
+              onPressed: () => Navigator.pop(sheet, true),
+              child: const Text('Delete category'),
+            ),
+            cancel(sheet),
+          ],
         ) ??
         false;
   }
+
+  Future<T?> deleteSheet<T>(List<Widget> Function(BuildContext) children) {
+    return showModalBottomSheet<T>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: colors.surface,
+      barrierColor: colors.onBrass.withValues(alpha: .5),
+      builder: (sheet) => SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 22, 20, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: children(sheet),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget cancel(BuildContext sheet) => TextButton(
+    onPressed: () => Navigator.pop(sheet),
+    child: const Text('Cancel'),
+  );
 
   Future<Category?> chooseDestination(CategoryDeletionDetails details) {
     Category? destination;
@@ -169,67 +186,92 @@ class CategoryEditSheetState extends ConsumerState<CategoryEditSheet> {
         ? 'uses this category. Choose where it goes'
         : 'use this category. Choose where they go';
     final muted = text.bodyMedium!.copyWith(color: colors.muted);
-    return showDialog<Category>(
-      context: context,
-      barrierColor: colors.onBrass.withValues(alpha: .5),
-      builder: (dialog) => StatefulBuilder(
-        builder: (context, select) => AlertDialog(
-          scrollable: true,
-          backgroundColor: colors.surface,
-          surfaceTintColor: colors.surface,
-          shadowColor: colors.onBrass,
-          title: Text('Delete ${details.category.name}?'),
-          content: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
+    return deleteSheet<Category>(
+      (sheet) => [
+        Text('Delete ${details.category.name}?', style: text.titleLarge),
+        const SizedBox(height: 12),
+        Text(
+          '${entryCountLabel(count)} $subject, so your spending history stays correct.',
+        ),
+        const SizedBox(height: 8),
+        StatefulBuilder(
+          builder: (context, select) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                '${entryCountLabel(count)} $subject, so your spending history stays correct.',
-              ),
-              const SizedBox(height: 12),
-              Text('Move entries to', style: muted),
-              DropdownButton<Category>(
+              ListTile(
                 key: const ValueKey('move-category-picker'),
-                dropdownColor: colors.surface,
-                underline: Divider(height: .7, color: colors.rule),
-                isExpanded: true,
-                icon: PhosphorIcon(
-                  PhosphorIconsRegular.caretDown,
-                  size: 14,
-                  color: colors.muted,
-                ),
-                value: destination,
-                hint: const Text('Choose a category'),
-                items: [
-                  for (final category in details.destinations)
-                    DropdownMenuItem(
-                      value: category,
-                      child: Text(category.name),
+                contentPadding: EdgeInsets.zero,
+                title: Text('Move entries to', style: muted),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(destination?.name ?? 'Choose a category'),
+                    const SizedBox(width: 8),
+                    PhosphorIcon(
+                      PhosphorIconsRegular.caretRight,
+                      size: 14,
+                      color: colors.muted,
                     ),
-                ],
-                onChanged: details.destinations.isEmpty
+                  ],
+                ),
+                onTap: details.destinations.isEmpty
                     ? null
-                    : (choice) => select(() => destination = choice),
+                    : () async {
+                        final choice = await pickDestination(
+                          context,
+                          details.destinations,
+                        );
+                        if (context.mounted && choice != null) {
+                          select(() => destination = choice);
+                        }
+                      },
               ),
+              Divider(height: .7, thickness: .7, color: colors.rule),
               if (details.destinations.isEmpty)
                 Text(
                   'Add another category of this type or archive this one.',
                   style: muted,
                 ),
+              const SizedBox(height: 18),
+              FilledButton(
+                style: deleteButtonStyle(),
+                onPressed: destination == null
+                    ? null
+                    : () => Navigator.pop(sheet, destination),
+                child: Text('Move ${entryCountLabel(count)} and delete'),
+              ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialog),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              style: deleteButtonStyle(),
-              onPressed: destination == null
-                  ? null
-                  : () => Navigator.pop(dialog, destination),
-              child: Text('Move ${entryCountLabel(count)} and delete'),
-            ),
+        ),
+        cancel(sheet),
+      ],
+    );
+  }
+
+  Future<Category?> pickDestination(
+    BuildContext context,
+    List<Category> choices,
+  ) {
+    return showModalBottomSheet<Category>(
+      context: context,
+      useSafeArea: true,
+      backgroundColor: colors.surface,
+      barrierColor: colors.onBrass.withValues(alpha: .5),
+      builder: (picker) => SafeArea(
+        top: false,
+        child: ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+          children: [
+            Text('Move entries to', style: text.titleLarge),
+            for (final category in choices) ...[
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(category.name),
+                onTap: () => Navigator.pop(picker, category),
+              ),
+              Divider(height: .7, thickness: .7, color: colors.rule),
+            ],
           ],
         ),
       ),

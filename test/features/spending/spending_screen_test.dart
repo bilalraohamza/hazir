@@ -4,6 +4,7 @@ import 'package:budget_app/features/fx/fx_service.dart';
 import 'package:budget_app/features/ledger/ledger_service.dart';
 import 'package:budget_app/features/spending/spending_screen.dart';
 import 'package:budget_app/ui/theme/app_theme.dart';
+import 'package:budget_app/ui/theme/app_colors.dart';
 import 'package:budget_app/ui/widgets/amount_text.dart';
 import 'package:decimal/decimal.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -26,11 +27,15 @@ void main() {
     ledger = LedgerService(fixture.db, fx, clock: () => fixture.now);
   });
 
-  Future<void> show(WidgetTester tester, {DateTime? today}) async {
+  Future<void> show(
+    WidgetTester tester, {
+    DateTime? today,
+    Brightness brightness = Brightness.light,
+  }) async {
     await tester.pumpWidget(
       fixture.build(
         child: MaterialApp(
-          theme: buildTheme(Brightness.light),
+          theme: buildTheme(brightness),
           home: SpendingScreen(clock: () => today ?? november),
         ),
       ),
@@ -250,6 +255,26 @@ void main() {
       expect(total(tester), const Money(2800, 'CNY'));
     },
   );
+
+  for (final brightness in Brightness.values) {
+    testWidgets('Undo bar uses the surface color in ${brightness.name} mode', (
+      tester,
+    ) async {
+      await tester.runAsync(() => expense(2800, note: 'Lunch'));
+      await show(tester, brightness: brightness);
+      await tap(tester, find.text('Food'));
+      await tester.drag(find.text('Lunch'), const Offset(-650, 0));
+      await tester.pumpAndSettle();
+      await tap(tester, find.text('Delete'));
+      final bar = tester.widget<SnackBar>(find.byType(SnackBar));
+      final colors = brightness == Brightness.light
+          ? AppColors.light
+          : AppColors.dark;
+      expect(bar.backgroundColor, colors.surface);
+      expect((bar.shape! as RoundedRectangleBorder).side.color, colors.rule);
+      expect(find.text('Undo'), findsOneWidget);
+    });
+  }
 
   testWidgets(
     'a second delete replaces the first Undo bar and expires after eight seconds',
